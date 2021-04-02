@@ -22,8 +22,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die;
-
+defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/mod/lesson/lib.php');
 
 use \booktool_wordimport\wordconverter;
@@ -34,7 +33,7 @@ use \booktool_wordimport\wordconverter;
  * @param string $wordfilename Word file to be processed into XML
  * @param stdClass $lesson Lesson to import into
  * @param context_module $context Current course context
- * @return array Array with 2 elements $importedentries and $rejectedentries
+ * @return void
  */
 function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, context_module $context) {
     global $CFG, $OUTPUT, $DB, $USER;
@@ -62,91 +61,46 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "w2x")) || (file_put_contents($tempxmlfilename, $xhtmlcontent)) == 0) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
     }
-
-    // Pass 2 - convert the initial XHTML into Moodle Lesson XML using localised table cell labels.
-    // XSLT stylesheet and parameters to convert generic XHTML into Moodle Lesson XML.
-    $importstylesheet = __DIR__ . DIRECTORY_SEPARATOR . "xhtml2lesson.xsl";
-    $parameters = array (
-        'moodle_language' => current_language(),
-        'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
-        'heading1stylelevel' => $heading1styleoffset,
-        'username' => $USER->firstname . ' ' . $USER->lastname,
-        'debug_flag' => '1'
-    );
-
-    $xmlcontainer = "<pass2Container>\n<lesson>" . $xhtmlcontent . "</lesson>\n" .
-        "<imagesContainer>\n" . $imagestring . "</imagesContainer>\n" .
-        local_lesson_wordimport_get_text_labels() . "\n</pass2Container>";
-    $lessonxml = $word2xml->convert($xmlcontainer, $importstylesheet, $parameters);
-    $lessonxml = str_replace('<GLOSSARY xmlns="http://www.w3.org/1999/xhtml"', '<GLOSSARY', $lessonxml);
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "x2g")) || (file_put_contents($tempxmlfilename, $lessonxml)) == 0) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
-    }
-
-    // Convert the Lesson XML into an internal structure for importing into database.
-    // This code is copied from /mod/lesson/import.php line 187 onwards.
-    $importedentries = 0;
-    $importedcats    = 0;
-    $entriesrejected = 0;
-    $rejections      = '';
-    $glossarycontext = $context;
-
-
-
 }
 
 /**
  * Export HTML pages to a Word file
  *
  * @param stdClass $lesson Lesson to export
+ * @param cm_info $cm Module info
  * @return string
  */
-function local_lesson_wordimport_export(stdClass $lesson) {
+function local_lesson_wordimport_export(stdClass $lesson, cm_info $cm) {
     global $CFG;
 
-    // Export the current lesson into Lesson XML, then into XHTML, and write to a Word file.
-    $lessonxml = glossary_generate_export_file($lesson, null, 0); // Include categories.
-    // Get a temporary file and store the XML content to transform.
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "gls")) || (file_put_contents($tempxmlfilename, $lessonxml)) == 0) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
-    }
-    $lessonxml = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", $lessonxml);
+    // Gather all the lesson content into a single HTML string.
+    $lesson = new Lesson($lesson);
+    $pages = $lesson->load_all_pages();
+    $pageids = array_keys($pages);
+    $context = context_module::instance($cm->id);
+    $lessonhtml = "";
 
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "mdl")) ||
-        (file_put_contents($tempxmlfilename, local_lesson_wordimport_get_text_labels())) == 0) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
-    }
-    // Pass 1 - convert the Lesson XML into XHTML and an array of images.
-    // Stylesheet to convert Moodle Lesson XML into generic XHTML.
-    $exportstylesheet = __DIR__ . "/glossary2xhtml.xsl";
-    // Set parameters for XSLT transformation. Note that we cannot use $arguments though.
-    $parameters = array (
-        'moodle_language' => current_language(),
-        'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
-        'moodle_release' => $CFG->release,
-        'moodle_url' => $CFG->wwwroot . "/",
-        'moodle_module' => 'lesson',
-        'debug_flag' => '1',
-        'transformationfailed' => get_string('transformationfailed', 'local_lesson_wordimport', $exportstylesheet)
-    );
+    // Loop through the lesson pages and process each one.
+    foreach ($pages as $page) {
+        $answers = $page->get_answers();
+        $contents = $page->contents;
 
-    // Assemble the lesson contents and localised labels to a single XML file for easier XSLT processing.
-    $pass1input = "<pass1Container>\n" . $lessonxml .  local_lesson_wordimport_get_text_labels() . "\n</pass1Container>";
+        // Append answers to the end of question pages.
+        // TODO: Should include questions too.
+        $contents = local_lesson_wordimport_format_answers($page);
 
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "p1i")) || (file_put_contents($tempxmlfilename, $pass1input) == 0)) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
+        // Fix pluginfile urls.
+        $contents = file_rewrite_pluginfile_urls($contents, 'pluginfile.php', $context->id,
+                                                      'mod_lesson', 'page_contents', $page->id);
+        $contents = format_text($contents, FORMAT_MOODLE, array('overflowdiv' => false, 'allowid' => true, 'para' => false));
+        $lessonhtml .= '<h1>' . $page->title . '</h1>' . $contents;
     }
-    $word2xml = new wordconverter();
-    $lessonhtml = $word2xml->convert($pass1input, $exportstylesheet, $parameters);
-    $lessonhtml = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", $lessonhtml);
 
-    // Pass 2 - convert XHTML into Word-compatible XHTML using localised table cell labels.
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "p1o")) || (file_put_contents($tempxmlfilename, $lessonhtml) == 0)) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
-    }
+
     // Assemble the lesson contents and localised labels to a single XML file for easier XSLT processing.
     $pass2input = "<html>\n" . $lessonhtml .   "\n</html>";
     // Convert the XHTML string into a Word-compatible version, with images converted to Base64 data.
+    $word2xml = new wordconverter();
     $lessonword = $word2xml->export($pass2input, 'lesson');
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "p2o")) || (file_put_contents($tempxmlfilename, $lessonword) == 0)) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
@@ -166,9 +120,7 @@ function local_lesson_wordimport_get_text_labels() {
 
     // Release-independent list of all strings required in the XSLT stylesheets for labels etc.
     $textstrings = array(
-        'lesson' => array('aliases', 'casesensitive', 'concept',  'categories', 'definition', 'entryusedynalink',
-            'fullmatch', 'linking', 'pluginname'),
-        'local_lesson_wordimport' => array('teacherentry'),
+        'lesson' => array('modulename', 'modulename_help', 'modulename_link', 'pluginname'),
         'moodle' => array('no', 'yes', 'tags'),
         );
 
@@ -185,4 +137,153 @@ function local_lesson_wordimport_get_text_labels() {
     $expout = str_replace("<br>", "<br/>", $expout);
 
     return $expout;
+}
+
+/**
+ * Library functions
+ *
+ * @package   local_lessonexportepub
+ * @copyright 2017 Adam King, SHEilds eLearning
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+/**
+ * Retrieve and format question pages to include answers.
+ *
+ * @param A Lesson page.
+ * @return Formatted page contents.
+ */
+function local_lesson_wordimport_format_answers($page) {
+    $pagetype = $page->get_typeid();
+    $contents = $page->contents;
+    $answers = $page->answers;
+    $qtype = $page->qtype;
+
+    // Don't look for answers in lesson types and don't print
+    // short answer answer patterns.
+    if ($pagetype == 1 || $pagetype == 20) {
+        return $contents;
+    }
+
+    $pagetypes = array(
+        1 => "shortanswer",
+        2 => "truefalse",
+        3 => "multichoice",
+        5 => "matching",
+        8 => "numerical",
+        10 => "essay",
+        20 => "lessonpage"
+    );
+
+    $pagetype = $pagetypes[$pagetype];
+
+    $contents .= "<div class='export_answer_".$pagetype."_wrapper'>";
+
+    foreach ($answers as $answer) {
+        // If this is a matching question type, only print the answers, not responses.
+        if ($pagetype == 5 && $answer->answerformat == 1) {
+            continue;
+        }
+
+        $contents .= "<div class='export_answer_$pagetype'>$answer->answer</div>";
+    }
+
+    $contents .= "</div>";
+
+    return $contents;
+}
+
+/**
+ * Convert an image URL into a stored_file object, if it refers to a local file.
+ * @param $fileurl
+ * @param context $restricttocontext (optional) if set, only files from this lesson will be included
+ * @return null|stored_file
+ */
+function local_lesson_wordimport_get_image_file($fileurl, $restricttocontext = null) {
+    global $CFG;
+    if (strpos($fileurl, $CFG->wwwroot.'/pluginfile.php') === false) {
+        return null;
+    }
+
+    $fs = get_file_storage();
+    $params = substr($fileurl, strlen($CFG->wwwroot.'/pluginfile.php'));
+    if (substr($params, 0, 1) == '?') { // Slasharguments off.
+        $pos = strpos($params, 'file=');
+        $params = substr($params, $pos + 5);
+    } else { // Slasharguments on.
+        if (($pos = strpos($params, '?')) !== false) {
+            $params = substr($params, 0, $pos - 1);
+        }
+    }
+    $params = urldecode($params);
+    $params = explode('/', $params);
+    array_shift($params); // Remove empty first param.
+    $contextid = (int)array_shift($params);
+    $component = clean_param(array_shift($params), PARAM_COMPONENT);
+    $filearea  = clean_param(array_shift($params), PARAM_AREA);
+    $itemid = array_shift($params);
+
+    if (empty($params)) {
+        $filename = $itemid;
+        $itemid = 0;
+    } else {
+        $filename = array_pop($params);
+    }
+
+    if (empty($params)) {
+        $filepath = '/';
+    } else {
+        $filepath = '/'.implode('/', $params).'/';
+    }
+
+    if ($restricttocontext) {
+        if ($component != 'mod_lesson' || $contextid != $restricttocontext->id) {
+            return null; // Only allowed to include files directly from this lesson.
+        }
+    }
+
+    if (!$file = $fs->get_file($contextid, $component, $filearea, $itemid, $filepath, $filename)) {
+        if ($itemid) {
+            $filepath = '/'.$itemid.$filepath; // See if there was no itemid in the originalPath URL.
+            $itemid = 0;
+            $file = $fs->get_file($contextid, $component, $filename, $itemid, $filepath, $filename);
+        }
+    }
+
+    if (!$file) {
+        return null;
+    }
+    return $file;
+}
+
+
+/**
+ * Clean lesson page HTML, ensuring <img> tags are handled correctly.
+ *
+ * @param html The HTML string to clean.
+ * @param title The title of the page the HTML is for.
+ * @return string Cleaned up HTML
+ */
+function local_lesson_wordimport_add_html($html, $title) {
+    if ($config['tidy'] && class_exists('tidy')) {
+        $tidy = new tidy();
+        $tidy->parseString($html, array(), 'utf8');
+        $tidy->cleanRepair();
+        $html = $tidy->html()->value;
+    }
+
+    // Handle <img> tags.
+    if (preg_match_all('~(<img [^>]*?)src=([\'"])(.+?)[\'"]~', $html, $matches)) {
+        foreach ($matches[3] as $imageurl) {
+            if ($file = local_lesson_wordimport_get_image_file($imageurl)) {
+                $newpath = implode('/', array('images', $file->get_contextid(), $file->get_component(), $file->get_filearea(),
+                                              $file->get_itemid(), $file->get_filepath(), $file->get_filename()));
+                $newpath = str_replace(array('///', '//'), '/', $newpath);
+                // Should we add image data here?
+                // local_lesson_wordimport_add_item_file($file->get_content_file_handle(), $file->get_mimetype(), $newpath);
+                $html = str_replace($imageurl, $newpath, $html);
+            }
+        }
+    }
+    return $html;
 }

@@ -48,17 +48,18 @@ require_capability('mod/lesson:manage', $context);
 $PAGE->set_url('/local/lesson_wordimport/index.php', array('id' => $id, 'action' => $action));
 $PAGE->set_title($lesson->name);
 $PAGE->set_heading($course->fullname);
-echo $OUTPUT->header();
-echo $OUTPUT->heading($lesson->name);
 
 // If exporting, just convert the lesson pages into Word.
 if ($action == 'export') {
     // Export the current lesson into XHTML, and write to a Word file.
-    $lessontext = local_lesson_wordimport_export($lesson, $context);
+    $lessontext = local_lesson_wordimport_export($lesson, $cm);
     $filename = clean_filename(strip_tags(format_string($lesson->name)) . '.doc');
     send_file($lessontext, $filename, 10, 0, true, array('filename' => $filename));
     die;
 }
+
+echo $OUTPUT->header();
+echo $OUTPUT->heading($lesson->name);
 
 // Set up the Word file upload form.
 $mform = new local_lesson_wordimport_form(null, array('id' => $id, 'action' => $action));
@@ -87,41 +88,11 @@ if (!$data) { // Display the form.
     }
 
     // Convert the Word file content and import it into the lesson.
-    list ($importedentries, $entriesrejected) = local_lesson_wordimport_import($tmpfilename, $lesson, $context);
-    if ($importedentries == -1 && $entriesrejected == -1) {
-        echo $OUTPUT->box_start('glossarydisplay generalbox');
-        echo get_string('errorparsingxml', 'lesson');
-        echo $OUTPUT->continue_button(new moodle_url('/mod/lesson/view.php', array('id' => $id)));
-        echo $OUTPUT->box_end();
-    } else {
-        // Print the number of processed entries.
-        echo $OUTPUT->box_start('glossarydisplay generalbox');
-        echo '<table class="glossaryimportexport">';
-        echo '<tr>';
-        echo '<td width="50%" align="right">';
-        echo get_string("totalentries", "lesson");
-        echo ':</td>';
-        echo '<td width="50%" align="left">';
-        echo $importedentries + $entriesrejected;
-        echo '</td>';
-        echo '</tr>';
-        echo '<tr>';
-        echo '<td width="50%" align="right">';
-        echo get_string("importedentries", "lesson");
-        echo ':</td>';
-        echo '<td width="50%" align="left">';
-        echo $importedentries;
-        if ( $entriesrejected ) {
-            echo ' <small>(' . get_string("rejectedentries", "lesson") . ": $entriesrejected)</small>";
-        }
-        echo '</td>';
-        echo '</tr>';
-        echo '</table><hr />';
-
-        echo $OUTPUT->continue_button(new moodle_url('/mod/lesson/view.php', array('id' => $id)));
-        echo $OUTPUT->box_end();
-    }
-
+    local_lesson_wordimport_import($tmpfilename, $lesson, $context);
+    echo $OUTPUT->box_start('lessondisplay generalbox');
+    echo get_string('errorparsingxml', 'booktool_wordimport');
+    echo $OUTPUT->continue_button(new moodle_url('/mod/lesson/view.php', array('id' => $id)));
+    echo $OUTPUT->box_end();
 }
 
 // Finish the page.
