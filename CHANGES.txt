@@ -1,5 +1,5 @@
 # Change log
 
 Date          Version   Comment
-2021/04/02    0.7.0     Support export operation.
+2021/04/03    0.7.0     Support export to Word 2019+/365 with embedded images.
 2020/08/03    0.0.1     Initial draft version.

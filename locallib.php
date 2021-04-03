@@ -38,7 +38,7 @@ use \booktool_wordimport\wordconverter;
 function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, context_module $context) {
     global $CFG, $OUTPUT, $DB, $USER;
 
-    // Convert the Word file into Lesson XML
+    // Convert the Word file into Lesson pages.
     $heading1styleoffset = 1; // Map "Heading 1" styles to <h1>.
     // Pass 1 - convert the Word file content into XHTML and an array of images.
     $imagesforzipping = array();
@@ -78,30 +78,37 @@ function local_lesson_wordimport_export(stdClass $lesson, cm_info $cm) {
     $pages = $lesson->load_all_pages();
     $pageids = array_keys($pages);
     $context = context_module::instance($cm->id);
-    $lessonhtml = "";
+    // Set the Lesson name to be the Word file title.
+    $lessonhtml = '<p class="MsoTitle">' . $lesson->name . "</p>\n";
+    // Add the Description field.
+    // TODO: figure out how to include images, using file_rewrite_pluginfile_urls().
+    $lessonhtml .= $lesson->intro;
+
+    $word2xml = new wordconverter();
 
     // Loop through the lesson pages and process each one.
     foreach ($pages as $page) {
         $answers = $page->get_answers();
-        $contents = $page->contents;
+        $pagehtml = $page->contents;
 
         // Append answers to the end of question pages.
         // TODO: Should include questions too.
-        $contents = local_lesson_wordimport_format_answers($page);
-
-        // Fix pluginfile urls.
-        $contents = file_rewrite_pluginfile_urls($contents, 'pluginfile.php', $context->id,
-                                                      'mod_lesson', 'page_contents', $page->id);
-        $contents = format_text($contents, FORMAT_MOODLE, array('overflowdiv' => false, 'allowid' => true, 'para' => false));
-        $lessonhtml .= '<h1>' . $page->title . '</h1>' . $contents;
+        $pagehtml = local_lesson_wordimport_format_answers($page);
+        // Could use format_text($pagehtml, FORMAT_MOODLE, array('overflowdiv' => false, 'allowid' => true, 'para' => false));.
+        // Revert image paths back to @@PLUGINFILE@@ so that export function works properly.
+        // Must revert after format_text(), or a debug developer error is triggered.
+        $pagehtml = file_rewrite_pluginfile_urls($pagehtml, 'pluginfile.php', $context->id,
+                                  'mod_lesson', 'page_contents', $page->id, array('reverse' => true));
+        $lessonhtml .= '<div class="chapter" id="lesson' . $lesson->id . '_page' . $page->id . '">' . "\n" .
+            '<h1>' . $page->title . '</h1>' . "\n" . $pagehtml;
+        $lessonhtml .= $word2xml->base64_images($context->id, 'mod_lesson', 'page_contents', $page->id);
+        $lessonhtml .= '</div>';
     }
 
-
     // Assemble the lesson contents and localised labels to a single XML file for easier XSLT processing.
-    $pass2input = "<html>\n" . $lessonhtml .   "\n</html>";
     // Convert the XHTML string into a Word-compatible version, with images converted to Base64 data.
-    $word2xml = new wordconverter();
-    $lessonword = $word2xml->export($pass2input, 'lesson');
+    $moodlelabels = local_lesson_wordimport_get_text_labels();
+    $lessonword = $word2xml->export($lessonhtml, 'lesson', $moodlelabels, 'embedded');
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "p2o")) || (file_put_contents($tempxmlfilename, $lessonword) == 0)) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
     }
@@ -124,19 +131,18 @@ function local_lesson_wordimport_get_text_labels() {
         'moodle' => array('no', 'yes', 'tags'),
         );
 
-    $expout = "<moodlelabels>\n";
+    $labelstring = "<moodlelabels>";
     foreach ($textstrings as $typegroup => $grouparray) {
         foreach ($grouparray as $stringid) {
             $namestring = $typegroup . '_' . $stringid;
             // Clean up question type explanation, in case the default text has been overridden on the site.
             $cleantext = get_string($stringid, $typegroup);
-            $expout .= '<data name="' . $namestring . '"><value>' . $cleantext . "</value></data>\n";
+            $labelstring .= '<data name="' . $namestring . '"><value>' . $cleantext . "</value></data>\n";
         }
     }
-    $expout .= "</moodlelabels>";
-    $expout = str_replace("<br>", "<br/>", $expout);
+    $labelstring = str_replace("<br>", "<br/>", $labelstring) . "</moodlelabels>";
 
-    return $expout;
+    return $labelstring;
 }
 
 /**
@@ -155,14 +161,13 @@ function local_lesson_wordimport_get_text_labels() {
  */
 function local_lesson_wordimport_format_answers($page) {
     $pagetype = $page->get_typeid();
-    $contents = $page->contents;
+    $pagehtml = $page->contents;
     $answers = $page->answers;
     $qtype = $page->qtype;
 
-    // Don't look for answers in lesson types and don't print
-    // short answer answer patterns.
-    if ($pagetype == 1 || $pagetype == 20) {
-        return $contents;
+    // Don't look for answers in lesson types.
+    if ($pagetype == 20) {
+        return $pagehtml;
     }
 
     $pagetypes = array(
@@ -177,7 +182,7 @@ function local_lesson_wordimport_format_answers($page) {
 
     $pagetype = $pagetypes[$pagetype];
 
-    $contents .= "<div class='export_answer_".$pagetype."_wrapper'>";
+    $pagehtml .= "<div class='export_answer_" . $pagetype . "_wrapper'>";
 
     foreach ($answers as $answer) {
         // If this is a matching question type, only print the answers, not responses.
@@ -185,105 +190,11 @@ function local_lesson_wordimport_format_answers($page) {
             continue;
         }
 
-        $contents .= "<div class='export_answer_$pagetype'>$answer->answer</div>";
+        $pagehtml .= "<div class='export_answer_$pagetype'>$answer->answer</div>";
     }
 
-    $contents .= "</div>";
+    $pagehtml .= "</div>";
 
-    return $contents;
+    return $pagehtml;
 }
 
-/**
- * Convert an image URL into a stored_file object, if it refers to a local file.
- * @param $fileurl
- * @param context $restricttocontext (optional) if set, only files from this lesson will be included
- * @return null|stored_file
- */
-function local_lesson_wordimport_get_image_file($fileurl, $restricttocontext = null) {
-    global $CFG;
-    if (strpos($fileurl, $CFG->wwwroot.'/pluginfile.php') === false) {
-        return null;
-    }
-
-    $fs = get_file_storage();
-    $params = substr($fileurl, strlen($CFG->wwwroot.'/pluginfile.php'));
-    if (substr($params, 0, 1) == '?') { // Slasharguments off.
-        $pos = strpos($params, 'file=');
-        $params = substr($params, $pos + 5);
-    } else { // Slasharguments on.
-        if (($pos = strpos($params, '?')) !== false) {
-            $params = substr($params, 0, $pos - 1);
-        }
-    }
-    $params = urldecode($params);
-    $params = explode('/', $params);
-    array_shift($params); // Remove empty first param.
-    $contextid = (int)array_shift($params);
-    $component = clean_param(array_shift($params), PARAM_COMPONENT);
-    $filearea  = clean_param(array_shift($params), PARAM_AREA);
-    $itemid = array_shift($params);
-
-    if (empty($params)) {
-        $filename = $itemid;
-        $itemid = 0;
-    } else {
-        $filename = array_pop($params);
-    }
-
-    if (empty($params)) {
-        $filepath = '/';
-    } else {
-        $filepath = '/'.implode('/', $params).'/';
-    }
-
-    if ($restricttocontext) {
-        if ($component != 'mod_lesson' || $contextid != $restricttocontext->id) {
-            return null; // Only allowed to include files directly from this lesson.
-        }
-    }
-
-    if (!$file = $fs->get_file($contextid, $component, $filearea, $itemid, $filepath, $filename)) {
-        if ($itemid) {
-            $filepath = '/'.$itemid.$filepath; // See if there was no itemid in the originalPath URL.
-            $itemid = 0;
-            $file = $fs->get_file($contextid, $component, $filename, $itemid, $filepath, $filename);
-        }
-    }
-
-    if (!$file) {
-        return null;
-    }
-    return $file;
-}
-
-
-/**
- * Clean lesson page HTML, ensuring <img> tags are handled correctly.
- *
- * @param html The HTML string to clean.
- * @param title The title of the page the HTML is for.
- * @return string Cleaned up HTML
- */
-function local_lesson_wordimport_add_html($html, $title) {
-    if ($config['tidy'] && class_exists('tidy')) {
-        $tidy = new tidy();
-        $tidy->parseString($html, array(), 'utf8');
-        $tidy->cleanRepair();
-        $html = $tidy->html()->value;
-    }
-
-    // Handle <img> tags.
-    if (preg_match_all('~(<img [^>]*?)src=([\'"])(.+?)[\'"]~', $html, $matches)) {
-        foreach ($matches[3] as $imageurl) {
-            if ($file = local_lesson_wordimport_get_image_file($imageurl)) {
-                $newpath = implode('/', array('images', $file->get_contextid(), $file->get_component(), $file->get_filearea(),
-                                              $file->get_itemid(), $file->get_filepath(), $file->get_filename()));
-                $newpath = str_replace(array('///', '//'), '/', $newpath);
-                // Should we add image data here?
-                // local_lesson_wordimport_add_item_file($file->get_content_file_handle(), $file->get_mimetype(), $newpath);
-                $html = str_replace($imageurl, $newpath, $html);
-            }
-        }
-    }
-    return $html;
-}
