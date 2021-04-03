@@ -43,7 +43,6 @@ class local_lesson_wordimport_form extends moodleform {
      *
      * @return void
      */
-
     public function definition() {
         $mform = $this->_form;
         $data  = $this->_customdata;
@@ -73,7 +72,6 @@ class local_lesson_wordimport_form extends moodleform {
      * @param array $files
      * @return array
      */
-
     public function validation($data, $files) {
         global $USER;
 
