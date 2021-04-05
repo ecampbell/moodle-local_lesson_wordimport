@@ -18,15 +18,15 @@
  * Import Microsoft Word file into lesson version information
  *
  * @package    local_lesson_wordimport
- * @copyright  2020 Eoin Campbell
+ * @copyright  2021 Eoin Campbell
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2021040300;              // The current plugin version (Date: YYYYMMDDXX).
+$plugin->version   = 2021040500;              // The current plugin version (Date: YYYYMMDDXX).
 $plugin->requires = 2016052300;               // Requires Moodle 3.1 or higher.
 $plugin->component = 'local_lesson_wordimport';   // Full name of the plugin (used for diagnostics).
 $plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '0.7.0 (Build: 2021040300)'; // Human readable version information.
-$plugin->dependencies = array('booktool_wordimport' => 2021040300);
+$plugin->release = '0.7.1 (Build: 2021040500)'; // Human readable version information.
+$plugin->dependencies = array('booktool_wordimport' => 2021040500);

@@ -18,19 +18,20 @@
  * Import/Export Microsoft Word files library.
  *
  * @package    local_lesson_wordimport
- * @copyright  2020 Eoin Campbell
+ * @copyright  2021 Eoin Campbell
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/mod/lesson/lib.php');
+require_once($CFG->dirroot . '/mod/book/tool/wordimport/locallib.php');
 
 use \booktool_wordimport\wordconverter;
 
 /**
- * Convert the Word file into Lesson XML and import it into the current lesson.
+ * Convert the Word file into a set of HTML files and insert them the current lesson.
  *
- * @param string $wordfilename Word file to be processed into XML
+ * @param string $wordfilename Word file to be imported
  * @param stdClass $lesson Lesson to import into
  * @param context_module $context Current course context
  * @return void
@@ -38,29 +39,97 @@ use \booktool_wordimport\wordconverter;
 function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, context_module $context) {
     global $CFG, $OUTPUT, $DB, $USER;
 
-    // Convert the Word file into Lesson pages.
-    $heading1styleoffset = 1; // Map "Heading 1" styles to <h1>.
+    // Convert the Word file content into XHTML and an array of images.
+    $heading1styleoffset = 3; // Map "Heading 1" styles to <h1>.
     // Pass 1 - convert the Word file content into XHTML and an array of images.
     $imagesforzipping = array();
     $word2xml = new wordconverter();
     $word2xml->set_heading1styleOffset($heading1styleoffset);
-    $xhtmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
-    $xhtmlcontent = $word2xml->body_only($xhtmlcontent);
+    $htmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
 
-    // Convert the returned array of images, if any, into a string.
-    $imagestring = "";
-
-    foreach ($imagesforzipping as $imagename => $imagedata) {
-        $filetype = strtolower(pathinfo($imagename, PATHINFO_EXTENSION));
-        $base64data = base64_encode($imagedata);
-        $filedata = 'data:image/' . $filetype . ';base64,' . $base64data;
-        // Embed the image name and data into the HTML.
-        $imagestring .= '<img title="' . $imagename . '" src="' . $filedata . '"/>';
+    // Create a temporary Zip file to store the HTML and images for feeding to import function.
+    $zipfilename = tempnam($CFG->tempdir, "zip");
+    $zipfile = new ZipArchive;
+    if (!($zipfile->open($zipfilename, ZipArchive::CREATE))) {
+        // Cannot open zip file.
+        throw new \moodle_exception('cannotopenzip', 'error');
     }
 
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "w2x")) || (file_put_contents($tempxmlfilename, $xhtmlcontent)) == 0) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
+    // Add any images to the Zip file.
+    if (count($imagesforzipping) > 0) {
+        foreach ($imagesforzipping as $imagename => $imagedata) {
+            $zipfile->addFromString($imagename, $imagedata);
+        }
     }
+
+    // Split the HTML file into sections based on headings, and add the sections to the Zip file.
+    booktool_wordimport_split($htmlcontent, $zipfile, false);
+
+    // Add the Zip file to the file storage area.
+    $fs = get_file_storage();
+    $zipfilerecord = array(
+        'contextid' => $context->id,
+        'component' => 'user',
+        'filearea' => 'draft',
+        'itemid' => 0,
+        'filepath' => "/",
+        'filename' => basename($zipfilename)
+        );
+    $zipfile = $fs->create_file_from_pathname($zipfilerecord, $zipfilename);
+
+    // Import the content into Lesson pages. Argument 2, value 2 means 1 page per HTML file.
+    local_lesson_wordimport_import_lesson_pages($zipfile, 2, $lesson, $context);
+}
+
+/**
+ * Import HTML content into Lesson pages.
+ *
+ * This function consists of code copied from toolbook_importhtml_import_chapters() and modified for Lesson activity.
+ * @param A Lesson page.
+ * @param stored_file $package
+ * @param string $type type of the package ('typezipdirs' or 'typezipfiles')
+ * @param stdClass $lesson
+ * @param context_module $context
+ * @param bool $verbose
+ * @return Formatted page contents.
+ */
+function local_lesson_wordimport_import_lesson_pages(stored_file $package, string $type, stdClass $lesson, context_module $context) {
+    global $DB, $OUTPUT, $PAGE;
+
+    // Code copied from toolbook_importhtml_import_chapters() and modified for Lesson activity.
+    $lesson = new Lesson($lesson);
+    $fs = get_file_storage();
+    $pagefiles = toolbook_importhtml_get_chapter_files($package, $type);
+    $packer = get_file_packer('application/zip');
+    $fs->delete_area_files($context->id, 'mod_lesson', 'importwordtemp', 0);
+    $package->extract_to_storage($packer, $context->id, 'mod_lesson', 'importwordtemp', 0, '/');
+
+    foreach ($pagefiles as $pagefile) {
+        if ($file = $fs->get_file_by_hash(sha1("/$context->id/mod_lesson/importwordtemp/0/$pagefile->pathname"))) {
+            $page = new stdClass();
+            $htmlcontent = $file->get_content();
+
+            $page->lessonid = $lesson->id;
+            // Get the highest current page number.
+            $page->pageid = $DB->get_field_sql('SELECT MAX(id) FROM {lesson_pages} WHERE lessonid = ?', array($lesson->id));
+            // $page->id = 0;
+            // $page->pageid = 0;
+            $page->type = 20; // Everything is a page for the moment, no questions.
+            $page->qtype = 20; // Everything is a page for the moment, no questions.
+
+            $page->contents_editor = array();
+            // $page->contents_editor['text'] .= toolbook_importhtml_parse_body($htmlcontent);
+            $page->contents_editor['text'] = $htmlcontent;
+            $page->contents_editor['format'] = FORMAT_HTML;
+            $page->contents = $page->contents_editor['text'];
+            $page->title = toolbook_importhtml_parse_title($htmlcontent, $pagefile->pathname);
+
+            // Import the content into Lesson pages.
+            $lessonpage = lesson_page::create($page, $lesson, $context, $PAGE->course->maxbytes);
+        }
+    }
+
+    $fs->delete_area_files($context->id, 'mod_lesson', 'importwordtemp', 0);
 }
 
 /**

@@ -34,6 +34,11 @@ installing the new version.
 2.  Click on the "Export to Microsoft Word file" link in the "Lesson administration" menu.
 
 
+## Acknowledgements
+
+This plugin is inspired by Adam Kings plugins to export Lessons to ePub and PDF files.
+
+
 ## Contact information
 
 Web site: http://www.moodle2word.net/
