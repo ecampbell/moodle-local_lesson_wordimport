@@ -93,7 +93,8 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
  * @param bool $verbose
  * @return Formatted page contents.
  */
-function local_lesson_wordimport_import_lesson_pages(stored_file $package, string $type, stdClass $lesson, context_module $context) {
+function local_lesson_wordimport_import_lesson_pages(stored_file $package, string $type,
+            stdClass $lesson, context_module $context) {
     global $DB, $OUTPUT, $PAGE;
 
     // Code copied from toolbook_importhtml_import_chapters() and modified for Lesson activity.
@@ -112,15 +113,13 @@ function local_lesson_wordimport_import_lesson_pages(stored_file $package, strin
             $page->lessonid = $lesson->id;
             // Get the highest current page number.
             $page->pageid = $DB->get_field_sql('SELECT MAX(id) FROM {lesson_pages} WHERE lessonid = ?', array($lesson->id));
-            // $page->id = 0;
-            // $page->pageid = 0;
             $page->type = 20; // Everything is a page for the moment, no questions.
             $page->qtype = 20; // Everything is a page for the moment, no questions.
 
             $page->contents_editor = array();
-            // $page->contents_editor['text'] .= toolbook_importhtml_parse_body($htmlcontent);
             $page->contents_editor['text'] = $htmlcontent;
             $page->contents_editor['format'] = FORMAT_HTML;
+            // I don't know why we need both contents_editor['text'] and contents properties.
             $page->contents = $page->contents_editor['text'];
             $page->title = toolbook_importhtml_parse_title($htmlcontent, $pagefile->pathname);
 
