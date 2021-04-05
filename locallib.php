@@ -85,7 +85,6 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
  * Import HTML content into Lesson pages.
  *
  * This function consists of code copied from toolbook_importhtml_import_chapters() and modified for Lesson activity.
- * @param A Lesson page.
  * @param stored_file $package
  * @param string $type type of the package ('typezipdirs' or 'typezipfiles')
  * @param stdClass $lesson
@@ -216,7 +215,6 @@ function local_lesson_wordimport_get_text_labels() {
 /**
  * Library functions
  *
- * @package   local_lessonexportepub
  * @copyright 2017 Adam King, SHEilds eLearning
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -224,7 +222,7 @@ function local_lesson_wordimport_get_text_labels() {
 /**
  * Retrieve and format question pages to include answers.
  *
- * @param A Lesson page.
+ * @param stdClass $page A Lesson page
  * @return Formatted page contents.
  */
 function local_lesson_wordimport_format_answers($page) {
