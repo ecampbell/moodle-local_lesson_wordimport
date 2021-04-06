@@ -88,7 +88,7 @@ if (!$data) { // Display the form.
     }
 
     // Convert the Word file content and import it into the lesson.
-    local_lesson_wordimport_import($tmpfilename, $lesson, $context);
+    local_lesson_wordimport_import($tmpfilename, $lesson, $context, false);
     echo $OUTPUT->box_start('lessondisplay generalbox');
     echo $OUTPUT->continue_button(new moodle_url('/mod/lesson/view.php', array('id' => $id)));
     echo $OUTPUT->box_end();
