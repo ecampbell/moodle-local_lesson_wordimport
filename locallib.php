@@ -126,7 +126,7 @@ function local_lesson_wordimport_import_lesson_pages(stored_file $package,
     // Array to store pages after they've been added to the database.
     $pages = array();
 
-    // Display extra messages for debugging when verbose is true. $trace = new html_progress_trace();
+    // Display extra messages for debugging when verbose is true. $trace = new html_progress_trace();.
 
     // Replace the standard lesson object with a real one, and get the current last page ID in the lesson.
     $lesson = new Lesson($lesson);
@@ -187,7 +187,6 @@ function local_lesson_wordimport_import_lesson_pages(stored_file $package,
             }
             // Write the modified HTML contents back to the Lesson page field.
             $DB->set_field('lesson_pages', 'contents', $page->contents, array('id' => $page->id));
-            // $DB->update_record('lesson_pages', $page, true);
         }
     }
     unset($pages);
