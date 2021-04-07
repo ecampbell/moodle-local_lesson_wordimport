@@ -38,172 +38,39 @@ use \booktool_wordimport\wordconverter;
  * @return void
  */
 function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, context_module $context, bool $verbose = false) {
-    global $CFG, $OUTPUT, $DB, $USER;
+    global $CFG;
 
     // Convert the Word file content into XHTML and an array of images.
-    $heading1styleoffset = 3; // Map "Heading 1" styles to <h1>.
-    // Pass 1 - convert the Word file content into XHTML and an array of images.
     $imagesforzipping = array();
     $word2xml = new wordconverter();
-    $word2xml->set_heading1styleOffset($heading1styleoffset);
     $htmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
 
-    // Create a temporary Zip file to store the HTML and images for feeding to import function.
+    // Store images in a Zip file and split the HTML file into sections.
+    // Add the sections to the Zip file and store it in Moodles' file storage area.
     $zipfilename = tempnam($CFG->tempdir, "zip");
-    $zipfile = new ZipArchive;
-    if (!($zipfile->open($zipfilename, ZipArchive::CREATE))) {
-        // Cannot open zip file.
-        throw new \moodle_exception('cannotopenzip', 'error');
-    }
+    $zipfile = $word2xml->zipimages($zipfilename, $imagesforzipping);
+    $word2xml->split($htmlcontent, $zipfile, false, $verbose);
+    $zipfile = $word2xml->store($zipfilename, $zipfile, $context);
+    unlink($zipfilename);
 
-    // Add any images to the Zip file.
-    $imagefilelist = "";
-    if (count($imagesforzipping) > 0) {
-        foreach ($imagesforzipping as $imagename => $imagedata) {
-            $zipfile->addFromString($imagename, $imagedata);
-            $imagefilelist .= ", " . $imagename;
-        }
-    }
-    // Display extra messages.
-    $trace = new html_progress_trace();
-    if ($verbose) {
-        $trace->output("Images: " . $imagefilelist);
-    }
-
-    // Split the HTML file into sections based on headings, and add the sections to the Zip file.
-    booktool_wordimport_split($htmlcontent, $zipfile, false, $verbose);
-
-    // Add the Zip file to the file storage area.
-    $fs = get_file_storage();
-    $zipfilerecord = array(
-        'contextid' => $context->id,
-        'component' => 'user',
-        'filearea' => 'draft',
-        'itemid' => 0,
-        'filepath' => "/",
-        'filename' => basename($zipfilename)
-        );
-    $zipfile = $fs->create_file_from_pathname($zipfilerecord, $zipfilename);
-
-    // Import the content into Lesson pages. Argument 2, value 2 means 1 page per HTML file.
-    local_lesson_wordimport_import_lesson_pages($zipfile, 2, $lesson, $context, $verbose);
+    // Import the content into Lesson pages.
+    local_lesson_wordimport_import_lesson_pages($zipfile, $lesson, $context, $verbose);
 }
 
 /**
- * Import HTML content into Lesson pages.
- *
- * This function consists of code copied from toolbook_importhtml_import_chapters() and modified for Lesson activity.
- *
- * @param stored_file $package
- * @param string $type type of the package ('typezipdirs' or 'typezipfiles')
- * @param stdClass $lesson
- * @param context_module $context
- * @param bool $verbose Display extra information messages
- * @return void
- */
-function local_lesson_wordimport_import_lesson_pages(stored_file $package, string $type,
-            stdClass $lesson, context_module $context, bool $verbose) {
-    global $DB, $OUTPUT, $PAGE;
-
-    // Array to store pages after they've been added to the database.
-    $pages = array();
-
-    // Display extra messages for debugging when verbose is true.
-    $trace = new html_progress_trace();
-
-    // Replace the standard lesson object with a real one, and get the current last page ID in the lesson.
-    $lesson = new Lesson($lesson);
-    $lastpage = $DB->get_field_sql('SELECT MAX(id) FROM {lesson_pages} WHERE lessonid = ?', array($lesson->id));
-
-    // Prepare a temporary working area for the HTML and image files stored inside the Zip file.
-    $fs = get_file_storage();
-    $packer = get_file_packer('application/zip');
-    $fs->delete_area_files($context->id, 'mod_lesson', 'importwordtemp', 0);
-    $package->extract_to_storage($packer, $context->id, 'mod_lesson', 'importwordtemp', 0, '/');
-
-    // Process the HTML files and insert them as Lesson pages.
-    $pagefiles = toolbook_importhtml_get_chapter_files($package, $type);
-    foreach ($pagefiles as $pagefile) {
-        if ($file = $fs->get_file_by_hash(sha1("/$context->id/mod_lesson/importwordtemp/0/$pagefile->pathname"))) {
-            $page = new stdClass();
-            $page->pageid = $lastpage;
-            $page->lessonid = $lesson->id;
-            $page->type = 20; // Everything is a page for the moment, no questions.
-            $page->qtype = 20; // Everything is a page for the moment, no questions.
-
-            // Read the page title and body into separate fields.
-            $htmlcontent = $file->get_content();
-            $page->title = toolbook_importhtml_parse_title($htmlcontent, $pagefile->pathname);
-            $page->contents_editor = array();
-            $page->contents_editor['text'] = toolbook_importhtml_parse_body($htmlcontent);
-            $page->contents_editor['format'] = FORMAT_HTML;
-            // I don't know why we need both contents_editor['text'] and contents properties.
-            $page->contents = $page->contents_editor['text'];
-
-            if ($verbose) {
-                $trace->output("Inserting page after " . $page->pageid . " (" . $pagefile->pathname . "): " . $page->title, 1);
-            }
-
-            // Import the content into Lesson pages.
-            $lessonpage = lesson_page::create($page, $lesson, $context, $PAGE->course->maxbytes);
-            // Use this pages ID the next time around.
-            $lastpage = $lessonpage->id;
-            // Remember the page information because we need to post-process image paths.
-            $pages[$lessonpage->id] = $lessonpage;
-        }
-    }
-
-    // Now process the pages to fix up image references and link the pages sequentially.
-    if ($verbose) {
-            $trace->output("Relinking lesson pages...", 0);
-    }
-
-    $allpages = $DB->get_records('lesson_pages', array('lessonid' => $lesson->id), 'id');
-    foreach ($pages as $page) {
-        // find references to all files and copy them + relink them.
-        $matches = null;
-        if (preg_match_all('/(src)\s*=\s*"([^"]+)"/i', $page->contents, $matches)) {
-            $file_record = array('contextid' => $context->id, 'component' => 'mod_lesson', 'filearea' => 'page_contents', 'itemid' => $page->id);
-            foreach ($matches[0] as $i => $match) {
-                $filepath =  $matches[2][$i];
-                $filepath = toolbook_importhtml_fix_path($filepath);
-
-                if ($verbose) {
-                        $trace->output("Found image link: page = $page->id, matched = " . $matches[2][$i] . ", filepath = " . $filepath, 0);
-                }
-                if ($file = $fs->get_file_by_hash(sha1("/$context->id/mod_lesson/importwordtemp/0$filepath"))) {
-                    // Copy each image file from the temporary space to its proper location (mod_lesson/page_contents).
-                    $fs->create_file_from_storedfile($file_record, $file);
-                    // Add the standard Moodle prefix to the path in the img/@src attribute.
-                    $page->contents = str_replace($match, $matches[1][$i] . '="@@PLUGINFILE@@' . $filepath . '"', $page->contents);
-                }
-            }
-            // Write the modified HTML contents back to the Lesson page field.
-            $DB->set_field('lesson_pages', 'contents', $page->contents, array('id' => $page->id));
-        }
-    }
-    unset($pages);
-
-    // TODO: Rewrite link references in the HTML.
-
-    $fs->delete_area_files($context->id, 'mod_lesson', 'importwordtemp', 0);
-}
-
-/**
- * Export HTML pages to a Word file
+ * Export Lesson pages to a Word file
  *
  * @param stdClass $lesson Lesson to export
- * @param cm_info $cm Module info
- * @return string
+ * @param context_module $context Current course context
+ * @return string HTML string with embedded image data
  */
-function local_lesson_wordimport_export(stdClass $lesson, cm_info $cm) {
+function local_lesson_wordimport_export(stdClass $lesson, context_module $context) {
     global $CFG;
 
     // Gather all the lesson content into a single HTML string.
     $lesson = new Lesson($lesson);
     $pages = $lesson->load_all_pages();
     $pageids = array_keys($pages);
-    $context = context_module::instance($cm->id);
     // Set the Lesson name to be the Word file title.
     $lessonhtml = '<p class="MsoTitle">' . $lesson->name . "</p>\n";
     // Add the Description field.
@@ -239,6 +106,95 @@ function local_lesson_wordimport_export(stdClass $lesson, cm_info $cm) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
     }
     return $lessonword;
+}
+
+/**
+ * Import HTML content into Lesson pages.
+ *
+ * This function consists of code copied from toolbook_importhtml_import_chapters() and modified for Lesson activity.
+ *
+ * @param stored_file $package
+ * @param stdClass $lesson
+ * @param context_module $context
+ * @param bool $verbose Display extra information messages
+ * @return void
+ */
+function local_lesson_wordimport_import_lesson_pages(stored_file $package,
+                stdClass $lesson, context_module $context, bool $verbose = false) {
+    global $DB, $PAGE;
+
+    // Array to store pages after they've been added to the database.
+    $pages = array();
+
+    // Display extra messages for debugging when verbose is true. $trace = new html_progress_trace();
+
+    // Replace the standard lesson object with a real one, and get the current last page ID in the lesson.
+    $lesson = new Lesson($lesson);
+    $lastpage = $DB->get_field_sql('SELECT MAX(id) FROM {lesson_pages} WHERE lessonid = ?', array($lesson->id));
+
+    // Prepare a temporary working area for the HTML and image files stored inside the Zip file.
+    $fs = get_file_storage();
+    $packer = get_file_packer('application/zip');
+    $fs->delete_area_files($context->id, 'mod_lesson', 'importwordtemp', 0);
+    $package->extract_to_storage($packer, $context->id, 'mod_lesson', 'importwordtemp', 0, '/');
+
+    // Process the HTML files and insert them as Lesson pages. Argument 2 specifies whether Zip file contains directories.
+    $pagefiles = toolbook_importhtml_get_chapter_files($package, 2);
+    foreach ($pagefiles as $pagefile) {
+        if ($file = $fs->get_file_by_hash(sha1("/$context->id/mod_lesson/importwordtemp/0/$pagefile->pathname"))) {
+            $page = new stdClass();
+            $page->pageid = $lastpage;
+            $page->lessonid = $lesson->id;
+            $page->type = 20; // Everything is a page for the moment, no questions.
+            $page->qtype = 20; // Everything is a page for the moment, no questions.
+
+            // Read the page title and body into separate fields.
+            $htmlcontent = $file->get_content();
+            $page->title = toolbook_importhtml_parse_title($htmlcontent, $pagefile->pathname);
+            $page->contents_editor = array();
+            $page->contents_editor['text'] = toolbook_importhtml_parse_body($htmlcontent);
+            $page->contents_editor['format'] = FORMAT_HTML;
+            // I don't know why we need both contents_editor['text'] and contents properties.
+            $page->contents = $page->contents_editor['text'];
+
+            // Import the content into Lesson pages.
+            $lessonpage = lesson_page::create($page, $lesson, $context, $PAGE->course->maxbytes);
+            // Use this pages ID the next time around.
+            $lastpage = $lessonpage->id;
+            // Remember the page information because we need to post-process image paths.
+            $pages[$lessonpage->id] = $lessonpage;
+        }
+    }
+
+    // Now process the pages to fix up image references.
+    $allpages = $DB->get_records('lesson_pages', array('lessonid' => $lesson->id), 'id');
+    foreach ($pages as $page) {
+        // Find references to all files and copy them + relink them.
+        $matches = null;
+        if (preg_match_all('/(src)\s*=\s*"([^"]+)"/i', $page->contents, $matches)) {
+            $filerecord = array('contextid' => $context->id, 'component' => 'mod_lesson', 'filearea' => 'page_contents',
+                            'itemid' => $page->id);
+            foreach ($matches[0] as $i => $match) {
+                $filepath = $matches[2][$i];
+                $filepath = toolbook_importhtml_fix_path($filepath);
+
+                if ($file = $fs->get_file_by_hash(sha1("/$context->id/mod_lesson/importwordtemp/0$filepath"))) {
+                    // Copy each image file from the temporary space to its proper location (mod_lesson/page_contents).
+                    $fs->create_file_from_storedfile($filerecord, $file);
+                    // Add the standard Moodle prefix to the path in the img/@src attribute.
+                    $page->contents = str_replace($match, $matches[1][$i] . '="@@PLUGINFILE@@' . $filepath . '"', $page->contents);
+                }
+            }
+            // Write the modified HTML contents back to the Lesson page field.
+            $DB->set_field('lesson_pages', 'contents', $page->contents, array('id' => $page->id));
+            // $DB->update_record('lesson_pages', $page, true);
+        }
+    }
+    unset($pages);
+
+    // TODO: Rewrite link references in the HTML.
+
+    $fs->delete_area_files($context->id, 'mod_lesson', 'importwordtemp', 0);
 }
 
 /**

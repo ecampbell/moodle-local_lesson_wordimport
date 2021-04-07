@@ -33,7 +33,8 @@ require_once($CFG->libdir . '/filelib.php');
 
 $id = required_param('id', PARAM_INT); // Course Module ID (this lesson).
 $action = optional_param('action', 'import', PARAM_TEXT);  // Import or export action.
-$cat = optional_param('cat', 0, PARAM_ALPHANUM); // Include term categories.
+$verbose = optional_param('verbose', false, PARAM_BOOL); // Chapter ID.
+$imageformat = optional_param('imageformat', 'embedded', PARAM_TEXT); // Chapter ID.
 
 // Security checks.
 list ($course, $cm) = get_course_and_cm_from_cmid($id, 'lesson');
@@ -52,7 +53,7 @@ $PAGE->set_heading($course->fullname);
 // If exporting, just convert the lesson pages into Word.
 if ($action == 'export') {
     // Export the current lesson into XHTML, and write to a Word file.
-    $lessontext = local_lesson_wordimport_export($lesson, $cm);
+    $lessontext = local_lesson_wordimport_export($lesson, $context, $imageformat);
     $filename = clean_filename(strip_tags(format_string($lesson->name)) . '.doc');
     send_file($lessontext, $filename, 10, 0, true, array('filename' => $filename));
     die;
@@ -88,7 +89,7 @@ if (!$data) { // Display the form.
     }
 
     // Convert the Word file content and import it into the lesson.
-    local_lesson_wordimport_import($tmpfilename, $lesson, $context, false);
+    local_lesson_wordimport_import($tmpfilename, $lesson, $context, false, $verbose);
     echo $OUTPUT->box_start('lessondisplay generalbox');
     echo $OUTPUT->continue_button(new moodle_url('/mod/lesson/view.php', array('id' => $id)));
     echo $OUTPUT->box_end();
