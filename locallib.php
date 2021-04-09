@@ -42,15 +42,15 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
 
     // Convert the Word file content into XHTML and an array of images.
     $imagesforzipping = array();
-    $word2xml = new wordconverter();
+    $word2xml = new wordconverter('lesson_wordimport');
     $htmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
 
     // Store images in a Zip file and split the HTML file into sections.
     // Add the sections to the Zip file and store it in Moodles' file storage area.
     $zipfilename = tempnam($CFG->tempdir, "zip");
-    $zipfile = $word2xml->zipimages($zipfilename, $imagesforzipping);
-    $word2xml->split($htmlcontent, $zipfile, false, $verbose);
-    $zipfile = $word2xml->store($zipfilename, $zipfile, $context);
+    $zipfile = $word2xml->zip_images($zipfilename, $imagesforzipping);
+    $word2xml->split_html($htmlcontent, $zipfile, false, $verbose);
+    $zipfile = $word2xml->store_html($zipfilename, $zipfile, $context);
     unlink($zipfilename);
 
     // Import the content into Lesson pages.
@@ -77,7 +77,7 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
     // TODO: figure out how to include images, using file_rewrite_pluginfile_urls().
     $lessonhtml .= $lesson->intro;
 
-    $word2xml = new wordconverter();
+    $word2xml = new wordconverter('lesson_wordimport');
 
     // Loop through the lesson pages and process each one.
     foreach ($pages as $page) {
@@ -101,7 +101,7 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
     // Assemble the lesson contents and localised labels to a single XML file for easier XSLT processing.
     // Convert the XHTML string into a Word-compatible version, with images converted to Base64 data.
     $moodlelabels = local_lesson_wordimport_get_text_labels();
-    $lessonword = $word2xml->export($lessonhtml, 'lesson', $moodlelabels, 'embedded');
+    $lessonword = $word2xml->export($lessonhtml, 'lesson_wordimport', $moodlelabels, 'embedded');
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "p2o")) || (file_put_contents($tempxmlfilename, $lessonword) == 0)) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
     }
