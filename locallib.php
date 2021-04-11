@@ -24,9 +24,10 @@
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/mod/lesson/lib.php');
-require_once($CFG->dirroot . '/mod/book/tool/wordimport/locallib.php');
+require_once($CFG->dirroot . '/question/format/wordtable/format.php');
 
 use \booktool_wordimport\wordconverter;
+use \local_lesson_wordimport\questionconverter;
 
 /**
  * Convert the Word file into a set of HTML files and insert them the current lesson.
@@ -86,7 +87,8 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
 
         // Append answers to the end of question pages.
         // TODO: Should include questions too.
-        $pagehtml = local_lesson_wordimport_format_answers($page);
+        $qconvert = new questionconverter();
+        $pagehtml = $qconvert->export_question($page);
         // Could use format_text($pagehtml, FORMAT_MOODLE, array('overflowdiv' => false, 'allowid' => true, 'para' => false));.
         // Revert image paths back to @@PLUGINFILE@@ so that export function works properly.
         // Must revert after format_text(), or a debug developer error is triggered.
@@ -145,11 +147,16 @@ function local_lesson_wordimport_import_lesson_pages(stored_file $package,
             $page = new stdClass();
             $page->pageid = $lastpage;
             $page->lessonid = $lesson->id;
-            $page->type = 20; // Everything is a page for the moment, no questions.
-            $page->qtype = 20; // Everything is a page for the moment, no questions.
 
             // Read the page title and body into separate fields.
             $htmlcontent = $file->get_content();
+            // Is this a Question page?
+            if (stripos($htmlcontent, 'moodleQuestion') === false) {
+                $page->type = 20; // TODO: support importing question pages
+                $page->qtype = 20;
+            } else {
+            }
+
             $page->title = toolbook_importhtml_parse_title($htmlcontent, $pagefile->pathname);
             $page->contents_editor = array();
             $page->contents_editor['text'] = toolbook_importhtml_parse_body($htmlcontent);
@@ -225,56 +232,3 @@ function local_lesson_wordimport_get_text_labels() {
 
     return $labelstring;
 }
-
-/**
- * Library functions
- *
- * @copyright 2017 Adam King, SHEilds eLearning
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
-
-/**
- * Retrieve and format question pages to include answers.
- *
- * @param stdClass $page A Lesson page
- * @return Formatted page contents.
- */
-function local_lesson_wordimport_format_answers($page) {
-    $pagetype = $page->get_typeid();
-    $pagehtml = $page->contents;
-    $answers = $page->answers;
-    $qtype = $page->qtype;
-
-    // Don't look for answers in lesson types.
-    if ($pagetype == 20) {
-        return $pagehtml;
-    }
-
-    $pagetypes = array(
-        1 => "shortanswer",
-        2 => "truefalse",
-        3 => "multichoice",
-        5 => "matching",
-        8 => "numerical",
-        10 => "essay",
-        20 => "lessonpage"
-    );
-
-    $pagetype = $pagetypes[$pagetype];
-
-    $pagehtml .= "<div class='export_answer_" . $pagetype . "_wrapper'>";
-
-    foreach ($answers as $answer) {
-        // If this is a matching question type, only print the answers, not responses.
-        if ($pagetype == 5 && $answer->answerformat == 1) {
-            continue;
-        }
-
-        $pagehtml .= "<div class='export_answer_$pagetype'>$answer->answer</div>";
-    }
-
-    $pagehtml .= "</div>";
-
-    return $pagehtml;
-}
-
