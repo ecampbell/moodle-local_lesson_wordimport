@@ -1,4 +1,5 @@
 <?php
+
 // This file is part of Moodle - http://moodle.org/
 //
 // This program is free software: you can redistribute it and/or modify
@@ -30,3 +31,4 @@ $plugin->component = 'local_lesson_wordimport';   // Full name of the plugin (us
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = '0.8.4 (Build: 2021041700)'; // Human readable version information.
 $plugin->dependencies = array('booktool_wordimport' => 2021041100);
+

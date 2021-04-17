@@ -111,9 +111,10 @@ class questionconverter {
             if (preg_match('/<questiontext[^>]*>[^<]*(.*)<\/questiontext>/is', $matches[2], $stemmatches)) {
                 $questionstem = $stemmatches[1];
             }
-            if (preg_match_all('/<answer fraction="([0-9]*)"[^>]+>[^<]*<text>![CDATA[(.*)]]><\/text>>/i', $head, $answers)) { // MCQ answers.
+            if (preg_match_all('/<answer fraction="([0-9]*)"[^>]+>[^<]*<text>![CDATA[(.*)]]><\/text>>/i', $head, $answers)) {
+                // MCQ answers.
                 $questionstem .= "<ol>";
-                for ($i=0; $i < count($answers[0]); $i++) {
+                for ($i = 0; $i < count($answers[0]); $i++) {
                     $questionstem .= "<li>" . $answers[2][$i] . " (grade = " . $answers[1][$i] . ")</li>\n";
                 }
                 $questionstem .= "</ol>";
@@ -175,7 +176,7 @@ class questionconverter {
             foreach ($answers as $answer) {
                 // Handle Boolean special case.
                 if ($mqxmltype == "truefalse") {
-                    $answerstring = ($answer->score == 0)? 'false' : 'true';
+                    $answerstring = ($answer->score == 0) ? 'false' : 'true';
                 } else {
                     $answerstring = $answer->answer;
                 }
@@ -188,7 +189,7 @@ class questionconverter {
                 $mqxml .= '</answer>';
             }
         } else if ($mqxmltype == "matching") {
-            // Print object ($page).
+            // Could print page object here.
             foreach ($answers as $answer) {
                 $answerstring = $answer->answer;
                 $responsestring = $answer->response;
@@ -203,14 +204,12 @@ class questionconverter {
                     default:
                         break;
                 }
-                // print_object ($answer);
 
                 $mqxml .= '<subquestion format="html"><text>' . $answerstring . $jumpto . '</text>';
                 $mqxml .= '<answer><text>' . $responsestring . '</text></answer>';
                 $mqxml .= '</subquestion>';
             }
         }
-
 
         // Finish by adding the closing element.
         $mqxml .= "</question>";
