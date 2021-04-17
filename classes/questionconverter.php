@@ -96,6 +96,7 @@ class questionconverter {
      * Convert Moodle Question XML into a Lesson question page.
      *
      * @param stdClass $page A Lesson page
+     * @param string Moodle Question XML for conversion into XHTML
      * @return void
      */
     public function import_question(stdClass $page, string $mqxml) {
@@ -229,11 +230,15 @@ class questionconverter {
     /**
      * Convert Lesson page type label into a number
      *
-     * @param string $qlabel Question format page type name
+     * @param string $label Question format page type name
      * @return int the numeric value of a Lesson page type
      */
     public function get_pagetype_number(string $label) {
-        return $this->lessonpagetypes[$label];
+        if (isset($this->lessonpagetypes[$label]) {
+            return $this->lessonpagetypes[$label];
+        } else {
+            return 0;
+        }
     }
 
     /**
