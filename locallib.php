@@ -24,10 +24,10 @@
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/mod/lesson/lib.php');
-require_once($CFG->dirroot . '/question/format/wordtable/format.php');
+// require_once($CFG->dirroot . '/question/format/wordtable/format.php');
 
 use \booktool_wordimport\wordconverter;
-use \local_lesson_wordimport\questionconverter;
+// use \local_lesson_wordimport\questionconverter;
 
 /**
  * Convert the Word file into a set of HTML files and insert them the current lesson.
@@ -87,8 +87,9 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
 
         // Append answers to the end of question pages.
         // TODO: Should include questions too.
-        $qconvert = new questionconverter();
-        $pagehtml = $qconvert->export_question($page);
+        // $qconvert = new questionconverter();
+        // $pagehtml = $qconvert->export_question($page);
+        $pagehtml = $page->contents;
         // Could use format_text($pagehtml, FORMAT_MOODLE, array('overflowdiv' => false, 'allowid' => true, 'para' => false));.
         // Revert image paths back to @@PLUGINFILE@@ so that export function works properly.
         // Must revert after format_text(), or a debug developer error is triggered.

@@ -1,6 +1,7 @@
 # Change log
 
 Date          Version   Comment
+2021/04/17    0.8.4     Remove question export pending fixes.
 2021/04/11    0.8.3     Add support for Question page export.
 2021/04/09    0.8.2     Update code for latest Book plugin methods interface.
 2021/04/07    0.8.1     Tidy up code.

@@ -106,7 +106,7 @@ class questionconverter {
         $questionxml = $word2xml->convert($htmlcontent, $stylesheet);
 
         if (preg_match('/<question type="([^>]*)">(.+)<\/question>/is', $mqxml, $matches)) {
-            $page->qtype = $pagetypes[$matches[1]];
+            $page->qtype = $this->get_pagetype_number([$matches[1]]);
 
             if (preg_match('/<questiontext[^>]*>[^<]*(.*)<\/questiontext>/is', $matches[2], $stemmatches)) {
                 $questionstem = $stemmatches[1];
@@ -132,9 +132,9 @@ class questionconverter {
         $pagetype = $page->get_typeid();
         $pagehtml = $page->contents;
 
-        // Return if its a standard lesson page.
+        // Return the HTML if its a standard lesson page.
         // TODO: Handle jumps to other pages.
-        if ($pagetype == $this->lessonpagetypes["lessonpage"]) {
+        if ($this->is_lessonpage($pagetype)) {
             return $pagehtml;
         }
 
@@ -225,5 +225,40 @@ class questionconverter {
         $word2xml = new wordconverter('lesson_wordimport');
         $pagehtml = $word2xml->convert($mqxml, $stylesheet);
         return $pagehtml;
+    }
+
+    /**
+     * Convert Lesson page type label into a number
+     *
+     * @param string $qlabel Question format page type name
+     * @return int the numeric value of a Lesson page type
+     */
+    public function get_pagetype_number(string $label) {
+        return $this->lessonpagetypes[$label];
+    }
+
+    /**
+     * Convert Lesson page type number into a label
+     *
+     * @param int $lpnum Lesson page type number
+     * @return string Lesson page type label
+     */
+    public function get_pagetype_label(int $lpnum) {
+        $pagetypes = array_flip($this->lessonpagetypes);
+        return $pagetypes[$lpnum];
+    }
+
+    /**
+     * Check if page is a standard lesson page
+     *
+     * @param int $lpnum Lesson page type number
+     * @return bool True if not a question page
+     */
+    public function is_lessonpage(int $lpnum) {
+        if ($lpnum == $this->get_pagetype_number("lessonpage")) {
+            return true;
+        } else {
+            return false;
+        }
     }
 }
