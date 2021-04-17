@@ -1,7 +1,9 @@
 # Change log
 
 Date          Version   Comment
-2021/04/07    0.8.1     Tidy up code to use more booktool wordconverter class methods.
+2021/04/11    0.8.3     Add support for Question page export.
+2021/04/09    0.8.2     Update code for latest Book plugin methods interface.
+2021/04/07    0.8.1     Tidy up code.
 2021/04/06    0.8.0     Can now import a Word file containing images.
 2021/04/05    0.7.1     Support importing a Word file containing multiple pages of text, but not pictures.
 2021/04/03    0.7.0     Support export to Word 2019+/365 with embedded images.
