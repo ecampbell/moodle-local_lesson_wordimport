@@ -24,7 +24,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/mod/lesson/lib.php');
-// require_once($CFG->dirroot . '/question/format/wordtable/format.php');
 
 use \booktool_wordimport\wordconverter;
 // use \local_lesson_wordimport\questionconverter;
@@ -90,21 +89,30 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
         // $qconvert = new questionconverter();
         // $pagehtml = $qconvert->export_question($page);
         $pagehtml = $page->contents;
+        $pagehtml = local_lesson_wordimport_format_answers($page);
         // Could use format_text($pagehtml, FORMAT_MOODLE, array('overflowdiv' => false, 'allowid' => true, 'para' => false));.
         // Revert image paths back to @@PLUGINFILE@@ so that export function works properly.
         // Must revert after format_text(), or a debug developer error is triggered.
+
+        // Grab the images, convert any GIFs to PNG, and return the list of converted images.
+        $giffilenames = array();
+        $imagestring = $word2xml->base64_images($context->id, 'mod_lesson', 'page_contents', $page->id, $giffilenames);
+
+        // Grab the page text content, and update any GIF image names to the new PNG name.
         $pagehtml = file_rewrite_pluginfile_urls($pagehtml, 'pluginfile.php', $context->id,
                                   'mod_lesson', 'page_contents', $page->id, array('reverse' => true));
-        $lessonhtml .= '<div class="chapter" id="lesson' . $lesson->id . '_page' . $page->id . '">' . "\n" .
-            '<h1>' . $page->title . '</h1>' . "\n" . $pagehtml;
-        $lessonhtml .= $word2xml->base64_images($context->id, 'mod_lesson', 'page_contents', $page->id);
-        $lessonhtml .= '</div>';
+        if (count($giffilenames) > 0) {
+            $pagehtml = str_replace($giffilenames['gif'], $giffilenames['png'], $pagehtml);
+        }
+
+        $lessonhtml .= '<div class="chapter" id="page' . $page->id . '">' . "\n";
+        $lessonhtml .= '<h1>' . $page->title . '</h1>' . "\n" . $pagehtml . $imagestring . '</div>';
     }
 
     // Assemble the lesson contents and localised labels to a single XML file for easier XSLT processing.
     // Convert the XHTML string into a Word-compatible version, with images converted to Base64 data.
     $moodlelabels = local_lesson_wordimport_get_text_labels();
-    $lessonword = $word2xml->export($lessonhtml, 'lesson_wordimport', $moodlelabels, 'embedded');
+    $lessonword = $word2xml->export($lessonhtml, 'local_lesson_wordimport', $moodlelabels, 'embedded');
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "p2o")) || (file_put_contents($tempxmlfilename, $lessonword) == 0)) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
     }
@@ -152,10 +160,12 @@ function local_lesson_wordimport_import_lesson_pages(stored_file $package,
             // Read the page title and body into separate fields.
             $htmlcontent = $file->get_content();
             // Is this a Question page?
-            if (stripos($htmlcontent, 'moodleQuestion') === false) {
-                $page->type = 20; // TODO: support importing question pages
+            if (stripos($htmlcontent, 'moodleQuestion') === true) {
+                $page->type = 20; // TODO: support importing question pages.
                 $page->qtype = 20;
             } else {
+                $page->type = 20; // Everything is a page for the moment, no questions.
+                $page->qtype = 20;
             }
 
             $page->title = toolbook_importhtml_parse_title($htmlcontent, $pagefile->pathname);
@@ -175,26 +185,25 @@ function local_lesson_wordimport_import_lesson_pages(stored_file $package,
     }
 
     // Now process the pages to fix up image references.
-    $allpages = $DB->get_records('lesson_pages', array('lessonid' => $lesson->id), 'id');
+    // $allpages = $DB->get_records('lesson_pages', array('lessonid' => $lesson->id), 'id');
     foreach ($pages as $page) {
-        // Find references to all files and copy them + relink them.
+        // Find references to all image files and copy them.
         $matches = null;
-        if (preg_match_all('/(src)\s*=\s*"([^"]+)"/i', $page->contents, $matches)) {
+        if (preg_match_all('/src="([^"]+)"/i', $page->contents, $matches)) {
             $filerecord = array('contextid' => $context->id, 'component' => 'mod_lesson', 'filearea' => 'page_contents',
                             'itemid' => $page->id);
+            $dbhtml = $page->contents; // Copy page content temporarily, as $page->contents causes absolute URL in the image.
             foreach ($matches[0] as $i => $match) {
-                $filepath = $matches[2][$i];
-                $filepath = toolbook_importhtml_fix_path($filepath);
-
+                $filepath = '/' . $matches[1][$i];
                 if ($file = $fs->get_file_by_hash(sha1("/$context->id/mod_lesson/importwordtemp/0$filepath"))) {
                     // Copy each image file from the temporary space to its proper location (mod_lesson/page_contents).
                     $fs->create_file_from_storedfile($filerecord, $file);
-                    // Add the standard Moodle prefix to the path in the img/@src attribute.
-                    $page->contents = str_replace($match, $matches[1][$i] . '="@@PLUGINFILE@@' . $filepath . '"', $page->contents);
+
+                    // Prepend the default string before the image name in the src attribute, only if image found.
+                    $dbhtml = str_replace($match, 'src="@@PLUGINFILE@@' . $filepath . '"', $dbhtml);
                 }
             }
-            // Write the modified HTML contents back to the Lesson page field.
-            $DB->set_field('lesson_pages', 'contents', $page->contents, array('id' => $page->id));
+            $DB->set_field('lesson_pages', 'contents', $dbhtml, array('id' => $page->id));
         }
     }
     unset($pages);
@@ -232,4 +241,56 @@ function local_lesson_wordimport_get_text_labels() {
     $labelstring = str_replace("<br>", "<br/>", $labelstring) . "</moodlelabels>";
 
     return $labelstring;
+}
+
+/**
+ * Library functions
+ *
+ * @copyright 2017 Adam King, SHEilds eLearning
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+/**
+ * Retrieve and format question pages to include answers.
+ *
+ * @param stdClass $page A Lesson page
+ * @return Formatted page contents.
+ */
+function local_lesson_wordimport_format_answers($page) {
+    $pagetype = $page->get_typeid();
+    $pagehtml = $page->contents;
+    $answers = $page->answers;
+    $qtype = $page->qtype;
+
+    // Don't look for answers in lesson types.
+    if ($pagetype == 20) {
+        return $pagehtml;
+    }
+
+    $pagetypes = array(
+        1 => "shortanswer",
+        2 => "truefalse",
+        3 => "multichoice",
+        5 => "matching",
+        8 => "numerical",
+        10 => "essay",
+        20 => "lessonpage"
+    );
+
+    $pagetype = $pagetypes[$pagetype];
+
+    $pagehtml .= "<div class='export_answer_" . $pagetype . "_wrapper'>";
+
+    foreach ($answers as $answer) {
+        // If this is a matching question type, only print the answers, not responses.
+        if ($pagetype == 5 && $answer->answerformat == 1) {
+            continue;
+        }
+
+        $pagehtml .= "<div class='export_answer_$pagetype'>$answer->answer</div>";
+    }
+
+    $pagehtml .= "</div>";
+
+    return $pagehtml;
 }

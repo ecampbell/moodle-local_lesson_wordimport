@@ -18,7 +18,7 @@
  * Privacy information for administration tool upload enrolment methods- no user data stored.
  *
  * @package     local_lesson_wordimport
- * @copyright   2020 Eoin Campbell
+ * @copyright   2021 Eoin Campbell
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -29,7 +29,7 @@ defined('MOODLE_INTERNAL') || die();
 /**
  * Privacy Subsystem for local_lesson_wordimport implementing null_provider.
  *
- * @copyright   2020 Eoin Campbell
+ * @copyright   2021 Eoin Campbell
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class provider implements \core_privacy\local\metadata\null_provider {
@@ -42,7 +42,7 @@ class provider implements \core_privacy\local\metadata\null_provider {
      *
      * @return  string
      */
-    public static function get_reason() {
+    public static function get_reason() : string {
         return 'privacy:metadata';
     }
 }
