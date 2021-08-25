@@ -112,9 +112,6 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
     // Convert the XHTML string into a Word-compatible version, with images converted to Base64 data.
     $moodlelabels = local_lesson_wordimport_get_text_labels();
     $lessonword = $word2xml->export($lessonhtml, 'local_lesson_wordimport', $moodlelabels, 'embedded');
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "p2o")) || (file_put_contents($tempxmlfilename, $lessonword) == 0)) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_lesson_wordimport', $tempxmlfilename));
-    }
     return $lessonword;
 }
 
