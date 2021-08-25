@@ -1,6 +1,7 @@
 # Change log
 
 Date          Version   Comment
+2021/08/25    1.0.1     Initial support for exporting question pages.
 2021/08/21    1.0.0     Stable release, convert GIF images to PNG on export for Word compatibility.
 2021/04/17    0.8.4     Fix image paths, but exclude question support until it works.
 2021/04/11    0.8.3     Add support for Question page export.

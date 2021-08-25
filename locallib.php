@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/mod/lesson/lib.php');
 
 use \booktool_wordimport\wordconverter;
-// use \local_lesson_wordimport\questionconverter;
+use \local_lesson_wordimport\questionconverter;
 
 /**
  * Convert the Word file into a set of HTML files and insert them the current lesson.
@@ -42,7 +42,7 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
 
     // Convert the Word file content into XHTML and an array of images.
     $imagesforzipping = array();
-    $word2xml = new wordconverter('lesson_wordimport');
+    $word2xml = new wordconverter('local_lesson_wordimport');
     $htmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
 
     // Store images in a Zip file and split the HTML file into sections.
@@ -77,19 +77,18 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
     // TODO: figure out how to include images, using file_rewrite_pluginfile_urls().
     $lessonhtml .= $lesson->intro;
 
-    $word2xml = new wordconverter('lesson_wordimport');
+    $word2xml = new wordconverter('local_lesson_wordimport');
 
     // Loop through the lesson pages and process each one.
+    $qconvert = new questionconverter($pages);
     foreach ($pages as $page) {
-        $answers = $page->get_answers();
-        $pagehtml = $page->contents;
-
         // Append answers to the end of question pages.
-        // TODO: Should include questions too.
-        // $qconvert = new questionconverter();
-        // $pagehtml = $qconvert->export_question($page);
-        $pagehtml = $page->contents;
-        $pagehtml = local_lesson_wordimport_format_answers($page);
+        if ($qconvert->is_lessonpage($page->type)) {
+            $pagehtml = $page->contents;
+        } else {  // Some kind of question page.
+            $pagehtml = $qconvert->export_question($page);
+        }
+
         // Could use format_text($pagehtml, FORMAT_MOODLE, array('overflowdiv' => false, 'allowid' => true, 'para' => false));.
         // Revert image paths back to @@PLUGINFILE@@ so that export function works properly.
         // Must revert after format_text(), or a debug developer error is triggered.
@@ -241,56 +240,4 @@ function local_lesson_wordimport_get_text_labels() {
     $labelstring = str_replace("<br>", "<br/>", $labelstring) . "</moodlelabels>";
 
     return $labelstring;
-}
-
-/**
- * Library functions
- *
- * @copyright 2017 Adam King, SHEilds eLearning
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
-
-/**
- * Retrieve and format question pages to include answers.
- *
- * @param stdClass $page A Lesson page
- * @return Formatted page contents.
- */
-function local_lesson_wordimport_format_answers($page) {
-    $pagetype = $page->get_typeid();
-    $pagehtml = $page->contents;
-    $answers = $page->answers;
-    $qtype = $page->qtype;
-
-    // Don't look for answers in lesson types.
-    if ($pagetype == 20) {
-        return $pagehtml;
-    }
-
-    $pagetypes = array(
-        1 => "shortanswer",
-        2 => "truefalse",
-        3 => "multichoice",
-        5 => "matching",
-        8 => "numerical",
-        10 => "essay",
-        20 => "lessonpage"
-    );
-
-    $pagetype = $pagetypes[$pagetype];
-
-    $pagehtml .= "<div class='export_answer_" . $pagetype . "_wrapper'>";
-
-    foreach ($answers as $answer) {
-        // If this is a matching question type, only print the answers, not responses.
-        if ($pagetype == 5 && $answer->answerformat == 1) {
-            continue;
-        }
-
-        $pagehtml .= "<div class='export_answer_$pagetype'>$answer->answer</div>";
-    }
-
-    $pagehtml .= "</div>";
-
-    return $pagehtml;
 }
