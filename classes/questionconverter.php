@@ -291,6 +291,22 @@ class questionconverter {
     }
 
     /**
+     * Get the jump links for a content page.
+     *
+     * @param stdClass $page A Lesson page
+     * @return XHTML table.
+     */
+    public function get_jumps($page) {
+        $pagehtml = '<table><thead><tr><td colspan="2">{content}</td><td><p style="QFType">LE</p></td></tr>';
+        $pagehtml .= '<tr><th><p style="TableHead">&#160;</p></th><th><p style="TableHead">' . get_string('description', 'mod_lesson') .
+            '/' . get_string('jump', 'mod_lesson') . '</p></th><th><p style="TableHead">&#160;</p></th></tr>';
+        foreach ($page->answers as $answer) {
+            $pagehtml .= '<tr><td><p style="Cell">&#160;</p></td><td><a href="#' . $this->pagejumps[$answer->jumpto] . '">' . $answer->answer . '</a></td><td><p style="Cell">&#160;</p></td></tr>';
+        }
+        $pagehtml .= "</tbody></table>";
+        return $pagehtml;
+    }
+    /**
      * Convert Lesson page type label into a number
      *
      * @param string $label Question format page type name
@@ -339,11 +355,16 @@ class questionconverter {
      * @param lesson_page_answer $answer Answer details
      * @return string Link HTML
      */
-    private function get_jumplink($answer, string $mqxmltype) {
+    public function get_jumplink($answer, string $mqxmltype) {
 
         // First figure out what the visible text should be.
         $anchortext = $answer->answer;
         switch ($mqxmltype) {
+            case "cluster":
+            case "clusterend":
+            case "branchend":
+                $answer->answer;
+                break;
             case "matching":
             case "essay":
                 if ($answer->jumpto <= 0) {
@@ -364,6 +385,11 @@ class questionconverter {
                 break;
             case "multichoice":
             case "truefalse":
+                break;
+            case "nextpage":
+            case "previouspage":
+            case "thispage":
+            case "endoflesson":
             default:
                 break;
         }

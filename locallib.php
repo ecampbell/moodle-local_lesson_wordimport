@@ -88,20 +88,23 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
         $pagetype = $qconvert->get_pagetype_label($page->qtype);
         // $word2xml->debug_write("<num>$page->id</num>\n<type>$pagetype</type>\n<typenum>$page->qtype</typenum>\n<title>$page->title</title>", "pt");
         switch ($pagetype) {
-            case "lessonpage":
-                $pagehtml = $page->contents;
-                break;
-            case "shortanswer":
-            case "truefalse":
-            case "multichoice":
-            case "matching":
-            case "numerical":
-            case "essay":
-                $pagehtml = $qconvert->export_question($page);
-                 break;
             case "branchend":
             case "clusterstart":
             case "clusterend":
+                $pagehtml = $page->contents;
+                break;
+            case "lessonpage":
+                $pagehtml = $qconvert->get_jumps($page);
+                $pagehtml = str_replace('{content}', $page->contents, $pagehtml);
+                break;
+            case "essay":
+            case "matching":
+            case "multichoice":
+            case "numerical":
+            case "shortanswer":
+            case "truefalse":
+                $pagehtml = $qconvert->export_question($page);
+                 break;
             default:
                  break;
         }
