@@ -29,6 +29,7 @@ require_once($CFG->dirroot . '/mod/lesson/lib.php');
 require_once($CFG->dirroot . '/question/format/wordtable/format.php');
 
 use \booktool_wordimport\wordconverter;
+use \qformat_wordtable\mqxmlconverter;
 
 /**
  * Convert Lesson questions into Moodle Question XML and then XHTML, and vice versa
@@ -86,9 +87,16 @@ class questionconverter {
      * @param array $pages Pages object
      */
     public function __construct(array $pages) {
-
-        // Set common parameters for all XSLT transformations. Note that the XSLT processor doesn't support $arguments.
+        // Keep track of the lesson pages to grab the titles when needed.
         $this->lessonpages = $pages;
+
+        // Set common parameters for all XSLT transformations.
+        $this->xsltparameters = array(
+            'pluginname' => 'local_lesson_wordimport',
+            'imagehandling' => 'referenced', // Question banks are embedded, Lessons are referenced.
+            'heading1stylelevel' => 3, // Question banks are 1, Lessons should be overridden to 3.
+            'debug_flag' => (debugging(null, DEBUG_DEVELOPER)) ? '1' : '0'
+            );
     }
 
     /**
@@ -100,10 +108,10 @@ class questionconverter {
      */
     public function import_question(stdClass $page, string $mqxml) {
 
-        $word2xml = new wordconverter('local_lesson_wordimport');
+        $word2xml = new wordconverter($this->xsltparameters['pluginname']);
         $question2xml = new qformat_wordtable();
         $stylesheet = $question2xml->get_import_stylesheet();
-        $questionxml = $word2xml->convert($htmlcontent, $stylesheet);
+        $questionxml = $word2xml->xsltransform($htmlcontent, $stylesheet);
 
         if (preg_match('/<question type="([^>]*)">(.+)<\/question>/is', $mqxml, $matches)) {
             $page->qtype = $this->get_pagetype_number([$matches[1]]);
@@ -136,8 +144,9 @@ class questionconverter {
         $pagetypes = array_flip($this->lessonpagetypes);
         $mqxmltype = $pagetypes[$pagetype];
 
+
         // Start with the standard XML common to all question types.
-        $mqxml = '<question type="' . $mqxmltype . '">';
+        $mqxml = '<quiz><question type="' . $mqxmltype . '">';
         $mqxml .= '<name><text>' . $page->title . '</text></name>';
         $mqxml .= '<questiontext format="html"><text>' . $page->contents . '</text></questiontext>';
 
@@ -272,19 +281,13 @@ class questionconverter {
                 break;
         } // End switch.
 
-        // Finish by adding the closing element.
-        $mqxml .= "</question>";
+        // Finish by adding the closing elements.
+        $mqxml .= "</question></quiz>";
 
-        // Wrap the Moodle Question XML and the labels data in a single XML container for processing into XHTML tables.
-        $word2xml = new wordconverter('local_lesson_wordimport');
-        $question2xml = new \qformat_wordtable();
-        $questionlabels = $question2xml->get_core_question_labels();
-        $mqxml = "<container>\n<quiz>" . $mqxml . "</quiz>\n" . $questionlabels . "\n</container>";
-        $stylesheet = $question2xml->get_export_stylesheet();
-
-        // Convert the Moodle Question XML into XHTML.
-        $pagehtml = $word2xml->convert($mqxml, $stylesheet);
-        return $pagehtml;
+        // Convert the Moodle Question XML into Word-compatible XHTML.
+        $mqxml2xhtml = new mqxmlconverter($this->xsltparameters['pluginname']);
+        $xhtmldata = $mqxml2xhtml->convert_mqx2htm($mqxml, $this->xsltparameters['pluginname'], $this->xsltparameters['imagehandling']);
+        return $xhtmldata;
     }
 
     /**

@@ -27,6 +27,7 @@ require_once($CFG->dirroot . '/mod/lesson/lib.php');
 
 use \booktool_wordimport\wordconverter;
 use \local_lesson_wordimport\questionconverter;
+use \question\format\xml;
 
 /**
  * Convert the Word file into a set of HTML files and insert them the current lesson.
@@ -34,10 +35,11 @@ use \local_lesson_wordimport\questionconverter;
  * @param string $wordfilename Word file to be imported
  * @param stdClass $lesson Lesson to import into
  * @param context_module $context Current course context
+ * @param int $pageid Current page ID
  * @param bool $verbose Print extra information
  * @return void
  */
-function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, context_module $context, bool $verbose = false) {
+function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, context_module $context, int $pageid, bool $verbose = false) {
     global $CFG;
 
     // Convert the Word file content into XHTML and an array of images.
@@ -54,7 +56,7 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
     unlink($zipfilename);
 
     // Import the content into Lesson pages.
-    local_lesson_wordimport_import_lesson_pages($zipfile, $lesson, $context, $verbose);
+    local_lesson_wordimport_import_lesson_pages($zipfile, $lesson, $context, $pageid, $verbose);
 }
 
 /**
@@ -77,16 +79,34 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
     // TODO: figure out how to include images, using file_rewrite_pluginfile_urls().
     $lessonhtml .= $lesson->intro;
 
+    $qconvert = new questionconverter($pages);
     $word2xml = new wordconverter('local_lesson_wordimport');
 
     // Loop through the lesson pages and process each one.
-    $qconvert = new questionconverter($pages);
     foreach ($pages as $page) {
         // Append answers to the end of question pages.
+        $pagetype = $qconvert->get_pagetype_label($page->qtype);
+        // $word2xml->debug_write("<num>$page->id</num>\n<type>$pagetype</type>\n<typenum>$page->qtype</typenum>\n<title>$page->title</title>", "pt");
+        switch ($pagetype) {
+            case "lessonpage":
+                $pagehtml = $page->contents;
+                break;
+            case "shortanswer":
+            case "truefalse":
+            case "multichoice":
+            case "matching":
+            case "numerical":
+            case "essay":
+                $pagehtml = $qconvert->export_question($page);
+                 break;
+            case "branchend":
+            case "clusterstart":
+            case "clusterend":
+            default:
+                 break;
+        }
         if ($qconvert->is_lessonpage($page->type)) {
-            $pagehtml = $page->contents;
         } else {  // Some kind of question page.
-            $pagehtml = $qconvert->export_question($page);
         }
 
         // Could use format_text($pagehtml, FORMAT_MOODLE, array('overflowdiv' => false, 'allowid' => true, 'para' => false));.
@@ -105,13 +125,17 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
         }
 
         $lessonhtml .= '<div class="chapter" id="page' . $page->id . '">' . "\n";
-        $lessonhtml .= '<h1>' . $page->title . '</h1>' . "\n" . $pagehtml . $imagestring . '</div>';
+        $lessonhtml .= '<h1>' . $page->title . '</h1>' . "\n" . $pagehtml . $imagestring . '</div>' ."\n";
+        $word2xml->debug_write($lessonhtml, "htl");
     }
 
-    // Assemble the lesson contents and localised labels to a single XML file for easier XSLT processing.
+    // Wrap the lesson contents in a HTML file.
+    $lessonhtml = "<html><head><title>Fred</title></head><body>" . $lessonhtml . "</body></html>";
+    $word2xml->debug_write($lessonhtml, "xht");
     // Convert the XHTML string into a Word-compatible version, with images converted to Base64 data.
     $moodlelabels = local_lesson_wordimport_get_text_labels();
-    $lessonword = $word2xml->export($lessonhtml, 'local_lesson_wordimport', $moodlelabels, 'embedded');
+    $lessonword = $word2xml->export($lessonhtml, 'local_lesson_wordimport', $moodlelabels, 'referenced');
+    $word2xml->debug_write($lessonword, "xhw");
     return $lessonword;
 }
 
@@ -128,16 +152,25 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
  */
 function local_lesson_wordimport_import_lesson_pages(stored_file $package,
                 stdClass $lesson, context_module $context, bool $verbose = false) {
-    global $DB, $PAGE;
+    global $CFG, $DB, $PAGE;
+
+    $xsltparameters = array('pluginname' => 'local_lesson_wordimport',
+            'heading1stylelevel' => 3, // Map "Heading 1" style to <h3> element.
+            'imagehandling' => 'referenced'
+        );
+
+    // Gather all the lesson content into a single HTML string.
+    $lesson = new Lesson($lesson);
+    $currentpages = $lesson->load_all_pages();
 
     // Array to store pages after they've been added to the database.
-    $pages = array();
+    $newpages = array();
 
     // Display extra messages for debugging when verbose is true. $trace = new html_progress_trace();.
 
     // Replace the standard lesson object with a real one, and get the current last page ID in the lesson.
     $lesson = new Lesson($lesson);
-    $lastpage = $DB->get_field_sql('SELECT MAX(id) FROM {lesson_pages} WHERE lessonid = ?', array($lesson->id));
+    $lastpageid = $DB->get_field_sql('SELECT MAX(id) FROM {lesson_pages} WHERE lessonid = ?', array($lesson->id));
 
     // Prepare a temporary working area for the HTML and image files stored inside the Zip file.
     $fs = get_file_storage();
@@ -146,43 +179,54 @@ function local_lesson_wordimport_import_lesson_pages(stored_file $package,
     $package->extract_to_storage($packer, $context->id, 'mod_lesson', 'importwordtemp', 0, '/');
 
     // Process the HTML files and insert them as Lesson pages. Argument 2 specifies whether Zip file contains directories.
+    $qconverter = new questionconverter($currentpages);
     $pagefiles = toolbook_importhtml_get_chapter_files($package, 2);
     foreach ($pagefiles as $pagefile) {
         if ($file = $fs->get_file_by_hash(sha1("/$context->id/mod_lesson/importwordtemp/0/$pagefile->pathname"))) {
             $page = new stdClass();
-            $page->pageid = $lastpage;
+            $page->pageid = $lastpageid;
             $page->lessonid = $lesson->id;
 
             // Read the page title and body into separate fields.
             $htmlcontent = $file->get_content();
-            // Is this a Question page?
-            if (stripos($htmlcontent, 'moodleQuestion') === true) {
-                $page->type = 20; // TODO: support importing question pages.
-                $page->qtype = 20;
-            } else {
-                $page->type = 20; // Everything is a page for the moment, no questions.
-                $page->qtype = 20;
-            }
-
             $page->title = toolbook_importhtml_parse_title($htmlcontent, $pagefile->pathname);
-            $page->contents_editor = array();
-            $page->contents_editor['text'] = toolbook_importhtml_parse_body($htmlcontent);
-            $page->contents_editor['format'] = FORMAT_HTML;
-            // I don't know why we need both contents_editor['text'] and contents properties.
-            $page->contents = $page->contents_editor['text'];
+
+            // Is this a Question page?
+            if (!(stripos($htmlcontent, 'moodleQuestion'))) {
+                // Convert XHTML into Moodle Question XML, ignoring images.
+                $mqxml = $qconverter->import($htmlcontent, "", $xsltparameters);
+
+                // Save the MQ XML to a file, and convert it into a question in the lesson.
+                if (!($tempxmlfilename = tempnam($CFG->tempdir, "mqx")) || (file_put_contents($tempxmlfilename, $mqxml)) == 0) {
+                    throw new \moodle_exception(get_string('cannotopentempfile', 'booktool_wordimport', $tempxmlfilename));
+                }
+                $format = new qformat_xml();
+                if (!($format->importprocess($tempxmlfilename, $lesson, $lastpageid))) {
+                    unlink($tempxmlfilename);
+                    throw new \moodle_exception(get_string('processerror', 'lesson'));
+                }
+            } else {
+                $page->type = $qconverter->get_pagetype_number("lessonpage");
+                $page->qtype = $page->type;
+                $page->contents_editor = array();
+                $page->contents_editor['format'] = FORMAT_HTML;
+                $page->contents_editor['text'] = toolbook_importhtml_parse_body($htmlcontent);
+                // I don't know why we need both contents_editor['text'] and contents properties.
+                $page->contents = $page->contents_editor['text'];
+            }
 
             // Import the content into Lesson pages.
             $lessonpage = lesson_page::create($page, $lesson, $context, $PAGE->course->maxbytes);
             // Use this pages ID the next time around.
-            $lastpage = $lessonpage->id;
+            $lastpageid = $lessonpage->id;
             // Remember the page information because we need to post-process image paths.
-            $pages[$lessonpage->id] = $lessonpage;
+            $newpages[$lessonpage->id] = $lessonpage;
         }
     }
 
     // Now process the pages to fix up image references.
     // $allpages = $DB->get_records('lesson_pages', array('lessonid' => $lesson->id), 'id');
-    foreach ($pages as $page) {
+    foreach ($newpages as $page) {
         // Find references to all image files and copy them.
         $matches = null;
         if (preg_match_all('/src="([^"]+)"/i', $page->contents, $matches)) {
@@ -202,7 +246,7 @@ function local_lesson_wordimport_import_lesson_pages(stored_file $package,
             $DB->set_field('lesson_pages', 'contents', $dbhtml, array('id' => $page->id));
         }
     }
-    unset($pages);
+    unset($newpages);
 
     // TODO: Rewrite link references in the HTML.
 
