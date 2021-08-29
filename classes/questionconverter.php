@@ -278,11 +278,17 @@ class questionconverter {
      * @return XHTML table.
      */
     public function get_jumps($page) {
-        $pagehtml = '<table><thead><tr><td colspan="2">{content}</td><td><p style="QFType">LE</p></td></tr>';
-        $pagehtml .= '<tr><th><p style="TableHead">&#160;</p></th><th><p style="TableHead">' . get_string('description', 'mod_lesson') .
-            '/' . get_string('jump', 'mod_lesson') . '</p></th><th><p style="TableHead">&#160;</p></th></tr>';
+        $pagehtml = '<table><thead><tr><td colspan="2" style="width: 12.0cm">{content}</td>' .
+                '<td style="width: 1.0cm"><p style="QFType">LE</p></td></tr>' .
+                '<tr><th style="width: 1.0cm"><p style="TableHead">&#160;</p></th>' .
+                '<th style="width: 11.0cm"><p style="TableHead">' . get_string('description', 'mod_lesson') . '/' .
+                get_string('jump', 'mod_lesson') . '</p></th>' .
+                '<th style="width: 1.0cm"><p style="TableHead">&#160;</p></th></tr>';
         foreach ($page->answers as $answer) {
-            $pagehtml .= '<tr><td><p style="Cell">&#160;</p></td><td><a href="#' . $this->pagejumps[$answer->jumpto] . '">' . $answer->answer . '</a></td><td><p style="Cell">&#160;</p></td></tr>';
+            $pagehtml .= '<tr><td style="width: 1.0cm"><p style="Cell">&#160;</p></td>' .
+                '<td style="width: 11.0cm"><a href="#' . $this->pagejumps[$answer->jumpto] . '">' .
+                $answer->answer . '</a></td>' .
+                '<td style="width: 1.0cm"><p style="Cell">&#160;</p></td></tr>';
         }
         $pagehtml .= "</tbody></table>";
         return $pagehtml;
