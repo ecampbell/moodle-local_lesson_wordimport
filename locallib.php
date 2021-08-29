@@ -86,25 +86,21 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
     foreach ($pages as $page) {
         // Append answers to the end of question pages.
         $pagetype = $qconvert->get_pagetype_label($page->qtype);
-        // $word2xml->debug_write("<num>$page->id</num>\n<type>$pagetype</type>\n<typenum>$page->qtype</typenum>\n<title>$page->title</title>", "pt");
         switch ($pagetype) {
+            case "lessonpage":
+                $pagehtml = $page->contents;
+                break;
+            case "shortanswer":
+            case "truefalse":
+            case "multichoice":
+            case "matching":
+            case "numerical":
+            case "essay":
+                $pagehtml = $qconvert->export_question($page);
+                 break;
             case "branchend":
             case "clusterstart":
             case "clusterend":
-                $pagehtml = $page->contents;
-                break;
-            case "lessonpage":
-                $pagehtml = $qconvert->get_jumps($page);
-                $pagehtml = str_replace('{content}', $page->contents, $pagehtml);
-                break;
-            case "essay":
-            case "matching":
-            case "multichoice":
-            case "numerical":
-            case "shortanswer":
-            case "truefalse":
-                $pagehtml = $qconvert->export_question($page);
-                 break;
             default:
                  break;
         }
@@ -129,16 +125,13 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
 
         $lessonhtml .= '<div class="chapter" id="page' . $page->id . '">' . "\n";
         $lessonhtml .= '<h1>' . $page->title . '</h1>' . "\n" . $pagehtml . $imagestring . '</div>' ."\n";
-        $word2xml->debug_write($lessonhtml, "htl");
     }
 
     // Wrap the lesson contents in a HTML file.
     $lessonhtml = "<html><head><title>Fred</title></head><body>" . $lessonhtml . "</body></html>";
-    $word2xml->debug_write($lessonhtml, "xht");
     // Convert the XHTML string into a Word-compatible version, with images converted to Base64 data.
     $moodlelabels = local_lesson_wordimport_get_text_labels();
     $lessonword = $word2xml->export($lessonhtml, 'local_lesson_wordimport', $moodlelabels, 'referenced');
-    $word2xml->debug_write($lessonword, "xhw");
     return $lessonword;
 }
 
@@ -147,15 +140,16 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
  *
  * This function consists of code copied from toolbook_importhtml_import_chapters() and modified for Lesson activity.
  *
- * @param stored_file $package
+ * @param stored_file $zipfile
  * @param stdClass $lesson
  * @param context_module $context
+ * @param int $pageid
  * @param bool $verbose Display extra information messages
  * @return void
  */
-function local_lesson_wordimport_import_lesson_pages(stored_file $package,
-                stdClass $lesson, context_module $context, bool $verbose = false) {
-    global $CFG, $DB, $PAGE;
+function local_lesson_wordimport_import_lesson_pages(stored_file $zipfile,
+                stdClass $lesson, context_module $context, int $pageid, bool $verbose = false) {
+    global $DB, $PAGE;
 
     $xsltparameters = array('pluginname' => 'local_lesson_wordimport',
             'heading1stylelevel' => 3, // Map "Heading 1" style to <h3> element.
@@ -179,25 +173,32 @@ function local_lesson_wordimport_import_lesson_pages(stored_file $package,
     $fs = get_file_storage();
     $packer = get_file_packer('application/zip');
     $fs->delete_area_files($context->id, 'mod_lesson', 'importwordtemp', 0);
-    $package->extract_to_storage($packer, $context->id, 'mod_lesson', 'importwordtemp', 0, '/');
+    $zipfile->extract_to_storage($packer, $context->id, 'mod_lesson', 'importwordtemp', 0, '/');
 
     // Process the HTML files and insert them as Lesson pages. Argument 2 specifies whether Zip file contains directories.
     $qconverter = new questionconverter($currentpages);
-    $pagefiles = toolbook_importhtml_get_chapter_files($package, 2);
+    $pagefiles = toolbook_importhtml_get_chapter_files($zipfile, 2);
     foreach ($pagefiles as $pagefile) {
         if ($file = $fs->get_file_by_hash(sha1("/$context->id/mod_lesson/importwordtemp/0/$pagefile->pathname"))) {
             $page = new stdClass();
             $page->pageid = $lastpageid;
             $page->lessonid = $lesson->id;
+            $page->timecreated = time();
+
+            // Prepare a default answer set.
+            $newanswer = new stdClass();
+            $newanswer->lessonid = $lesson->id;
+            $newanswer->pageid = $page->pageid;
+            $newanswer->timecreated = $page->timecreated;
 
             // Read the page title and body into separate fields.
             $htmlcontent = $file->get_content();
             $page->title = toolbook_importhtml_parse_title($htmlcontent, $pagefile->pathname);
 
             // Is this a Question page?
-            if (!(stripos($htmlcontent, 'moodleQuestion'))) {
+            if (stripos($htmlcontent, 'moodleQuestion') !== false) {
                 // Convert XHTML into Moodle Question XML, ignoring images.
-                $mqxml = $qconverter->import($htmlcontent, "", $xsltparameters);
+                $mqxml = $qconverter->import_question($htmlcontent);
 
                 // Save the MQ XML to a file, and convert it into a question in the lesson.
                 if (!($tempxmlfilename = tempnam($CFG->tempdir, "mqx")) || (file_put_contents($tempxmlfilename, $mqxml)) == 0) {
@@ -209,17 +210,33 @@ function local_lesson_wordimport_import_lesson_pages(stored_file $package,
                     throw new \moodle_exception(get_string('processerror', 'lesson'));
                 }
             } else {
-                $page->type = $qconverter->get_pagetype_number("lessonpage");
-                $page->qtype = $page->type;
+                $page->qtype = $qconverter->get_pagetype_number("lessonpage");
+                $page->type = $page->qtype;
                 $page->contents_editor = array();
-                $page->contents_editor['format'] = FORMAT_HTML;
                 $page->contents_editor['text'] = toolbook_importhtml_parse_body($htmlcontent);
+                $page->contents_editor['format'] = FORMAT_HTML;
                 // I don't know why we need both contents_editor['text'] and contents properties.
                 $page->contents = $page->contents_editor['text'];
+
+                // Configure automatic jumps for the page, since they are not explicitly included.
+                $jumpkeys = array_keys($qconverter->pagejumps);
+                $i = 0;
+                $answers = array();
+                foreach ($jumpkeys as $jump) {
+                    $answer = clone($newanswer);
+                    $answer->jumpto = $jump;
+                    $answer->answer = get_string($qconverter->pagejumps[$jump], 'mod_lesson');
+                    $answer->id = $DB->insert_record("lesson_answers", $answer);
+                    $answers[$answer->id] = new lesson_page_answer($answer);
+                    $answers[$i] = $answer;
+                    $i++;
+                }
+                $page->answers = $answers;
+
+                // Import the content into Lesson pages.
+                $lessonpage = lesson_page::create($page, $lesson, $context, $PAGE->course->maxbytes);
             }
 
-            // Import the content into Lesson pages.
-            $lessonpage = lesson_page::create($page, $lesson, $context, $PAGE->course->maxbytes);
             // Use this pages ID the next time around.
             $lastpageid = $lessonpage->id;
             // Remember the page information because we need to post-process image paths.
@@ -228,7 +245,6 @@ function local_lesson_wordimport_import_lesson_pages(stored_file $package,
     }
 
     // Now process the pages to fix up image references.
-    // $allpages = $DB->get_records('lesson_pages', array('lessonid' => $lesson->id), 'id');
     foreach ($newpages as $page) {
         // Find references to all image files and copy them.
         $matches = null;

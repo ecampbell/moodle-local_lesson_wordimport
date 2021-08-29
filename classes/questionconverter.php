@@ -56,7 +56,7 @@ class questionconverter {
     );
 
     /** @var array Mapping between lesson question page type names and numbers. */
-    private $pagejumps = array(
+    public $pagejumps = array(
         -1 => "nextpage",
         -40 => "previouspage",
         0 => "thispage",
@@ -100,35 +100,16 @@ class questionconverter {
     }
 
     /**
-     * Convert Moodle Question XML into a Lesson question page.
+     * Convert a question in XHTML format into a Moodle Question XML string.
      *
-     * @param stdClass $page A Lesson page
-     * @param string Moodle Question XML for conversion into XHTML
-     * @return void
+     * @param string $xhtmlcontent Moodle Question XML for conversion into XHTML
+     * @return string
      */
-    public function import_question(stdClass $page, string $mqxml) {
-
-        $word2xml = new wordconverter($this->xsltparameters['pluginname']);
-        $question2xml = new qformat_wordtable();
-        $stylesheet = $question2xml->get_import_stylesheet();
-        $questionxml = $word2xml->xsltransform($htmlcontent, $stylesheet);
-
-        if (preg_match('/<question type="([^>]*)">(.+)<\/question>/is', $mqxml, $matches)) {
-            $page->qtype = $this->get_pagetype_number([$matches[1]]);
-
-            if (preg_match('/<questiontext[^>]*>[^<]*(.*)<\/questiontext>/is', $matches[2], $stemmatches)) {
-                $questionstem = $stemmatches[1];
-            }
-            if (preg_match_all('/<answer fraction="([0-9]*)"[^>]+>[^<]*<text>![CDATA[(.*)]]><\/text>>/i', $head, $answers)) {
-                // MCQ answers.
-                $questionstem .= "<ol>";
-                for ($i = 0; $i < count($answers[0]); $i++) {
-                    $questionstem .= "<li>" . $answers[2][$i] . " (grade = " . $answers[1][$i] . ")</li>\n";
-                }
-                $questionstem .= "</ol>";
-                $page->contents = $questionstem;
-            }
-        }
+    public function import_question(string $xhtmlcontent) {
+        // Convert the question table into Moodle Question XML.
+        $mqxml2xhtml = new mqxmlconverter($this->xsltparameters['pluginname']);
+        $mqxml = $mqxml2xhtml->convert_htm2mqx($xhtmlcontent, $this->xsltparameters['imagehandling']);
+        return $mqxml;
     }
 
     /**
