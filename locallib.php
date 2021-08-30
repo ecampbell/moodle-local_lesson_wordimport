@@ -28,6 +28,7 @@ require_once($CFG->dirroot . '/mod/lesson/lib.php');
 use \booktool_wordimport\wordconverter;
 use \local_lesson_wordimport\questionconverter;
 use \question\format\xml;
+use \mod\lesson\format;
 
 /**
  * Convert the Word file into a set of HTML files and insert them the current lesson.
@@ -113,9 +114,17 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
                 if (!($tempxmlfilename = tempnam($CFG->tempdir, "mqx")) || (file_put_contents($tempxmlfilename, $mqxml)) == 0) {
                     throw new \moodle_exception(get_string('cannotopentempfile', 'booktool_wordimport', $tempxmlfilename));
                 }
-                $format = new qformat_xml();
-                if (!($format->importprocess($tempxmlfilename, $lesson, $lastpageid))) {
-                    unlink($tempxmlfilename);
+                // Rename the temporary file to give it an xml suffix or import operation fails.
+                $xmlfilename = dirname($tempxmlfilename) . DIRECTORY_SEPARATOR . basename($tempxmlfilename, '.tmp') . '.xml';
+                rename($tempxmlfilename, $xmlfilename);
+
+                $formatclass = 'qformat_xml';
+                require_once($CFG->dirroot.'/question/format/xml/format.php');
+                $format = new $formatclass();
+                // $format->set_importcontext($context);
+                $format->setFilename($xmlfilename);
+                if (!($format->importprocess($xmlfilename, $lesson, $lastpageid))) {
+                    unlink($xmlfilename);
                     throw new \moodle_exception(get_string('processerror', 'lesson'));
                 }
             } else {
