@@ -88,8 +88,15 @@ if (!$data) { // Display the form.
         throw new moodle_exception(get_string('errorcreatingfile', 'error', $package->get_filename()));
     }
 
+    // Convert the Word file content and import it into the glossary.
+    $horizontaljumps = (!empty($data->layout)) ? true : false;
+    $displaymenu = (!empty($data->display)) ? true : false;
+    $previousjump = (!empty($data->previousjump)) ? true : false;
+    $endjump = (!empty($data->endjump)) ? true : false;
+
     // Convert the Word file content and import it into the lesson.
-    local_lesson_wordimport_import($tmpfilename, $lesson, $context, false, $verbose);
+    local_lesson_wordimport_import($tmpfilename, $lesson, $context, false, $horizontaljumps, $displaymenu,
+                $previousjump, $endjump, $verbose);
     echo $OUTPUT->box_start('lessondisplay generalbox');
     echo $OUTPUT->continue_button(new moodle_url('/mod/lesson/view.php', array('id' => $id)));
     echo $OUTPUT->box_end();

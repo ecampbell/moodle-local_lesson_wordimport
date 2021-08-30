@@ -26,9 +26,11 @@ defined('MOODLE_INTERNAL') || die();
 
 
 $string['cannotopentempfile'] = 'Cannot open temporary file <b>{$a}</b>';
+$string['endjump'] = 'Add "End of lesson" jump to content pages';
 $string['filetoimport'] = 'File to import.';
 $string['filetoimport_help'] = 'Upload <i>.docx</i> file saved from Microsoft Word or LibreOffice';
 $string['pluginname'] = 'Microsoft Word file Import/Export (Lesson)';
+$string['previousjump'] = 'Add "Previous page" jump to content pages';
 $string['privacy:metadata']      = 'The Microsoft Word file import/export tool for lessons does not store personal data.';
 $string['replacelesson'] = 'Replace lesson';
 $string['replaceglesson_help'] = 'Delete the current content of lesson before importing';

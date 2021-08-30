@@ -56,11 +56,11 @@ class questionconverter {
     );
 
     /** @var array Mapping between lesson question page type names and numbers. */
-    public $pagejumps = array(
-        -1 => "nextpage",
-        -40 => "previouspage",
-        0 => "thispage",
-        -9 => "endoflesson"
+    private $pagejumps = array(
+        "nextpage" => -1,
+        "previouspage" => -40,
+        "thispage" => 0,
+        "endoflesson" => -9
     );
 
     /** @var string Common XML fragment for all questions */
@@ -293,6 +293,7 @@ class questionconverter {
         $pagehtml .= "</tbody></table>";
         return $pagehtml;
     }
+
     /**
      * Convert Lesson page type label into a number
      *
@@ -319,6 +320,35 @@ class questionconverter {
             return $pagetypes[$lpnum];
         } else {
             return 0;
+        }
+    }
+
+    /**
+     * Convert Jump type label into a number
+     *
+     * @param string $label Page jump name
+     * @return int|bool the numeric value of a page jump
+     */
+    public function get_pagejump_number(string $label) {
+        if (isset($this->pagejumps[$label])) {
+            return $this->pagejumps[$label];
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Convert page jump number into a label
+     *
+     * @param int $lpnum Page jump number
+     * @return string|bool Page jump label
+     */
+    public function get_pagejump_label(int $lpnum) {
+        $pagejumps = array_flip($this->pagejumps);
+        if (isset($pagejumps[$lpnum])) {
+            return $pagejumps[$lpnum];
+        } else {
+            return false;
         }
     }
 

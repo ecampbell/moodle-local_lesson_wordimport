@@ -55,6 +55,18 @@ class local_lesson_wordimport_form extends moodleform {
         $mform->addHelpButton('importfile', 'filetoimport', 'local_lesson_wordimport');
         $mform->addRule('importfile', null, 'required', null, 'client');
 
+        $mform->addElement('checkbox', 'layout', null, get_string("arrangebuttonshorizontally", "lesson"));
+        $mform->setDefault('layout', true);
+
+        $mform->addElement('checkbox', 'display', null, get_string("displayinleftmenu", "lesson"));
+        $mform->setDefault('display', true);
+
+        $mform->addElement('checkbox', 'previousjump', null, get_string("previousjump", "local_lesson_wordimport"));
+        $mform->setDefault('previousjump', false);
+
+        $mform->addElement('checkbox', 'endjump', null, get_string("endjump", "local_lesson_wordimport"));
+        $mform->setDefault('endjump', false);
+
         $mform->addElement('hidden', 'id');
         $mform->setType('id', PARAM_INT);
 
