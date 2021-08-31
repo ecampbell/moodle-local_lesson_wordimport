@@ -71,11 +71,10 @@ class questionconverter {
     private $qmetadata = array('multichoice' => '<single>{singleanswer}</single><shuffleanswers>true</shuffleanswers>
                 <answernumbering>ABCD</answernumbering><correctfeedback format="html"><text></text></correctfeedback>
                 <incorrectfeedback format="html"><text></text></incorrectfeedback><shownumcorrect/>',
-        'essay' => '<responseformat>editorfilepicker</responseformat><responserequired>1</responserequired><graderinfo format="html"><text>{jump}</text></graderinfo>',
-                'essay2' => '<responsefieldlines>15</responsefieldlines><attachments>0</attachments>
-                <attachmentsrequired>0</attachmentsrequired><graderinfo format="html"><text></text></graderinfo>
-                <responsetemplate format="html"><text></text></responsetemplate>',
-        'matching' => '<shuffleanswers>true</shuffleanswers><correctfeedback format="html"><text>{correctfeedback}</text></correctfeedback>
+        'essay' => '<responseformat>editorfilepicker</responseformat><responserequired>1</responserequired>
+                <graderinfo format="html"><text>{jump}</text></graderinfo>',
+        'matching' => '<shuffleanswers>true</shuffleanswers>
+                <correctfeedback format="html"><text>{correctfeedback}</text></correctfeedback>
                 <incorrectfeedback format="html"><text>{incorrectfeedback}</text></incorrectfeedback>',
         'numerical' => '',
         'shortanswer' => '<usecase>0</usecase>',
@@ -125,13 +124,12 @@ class questionconverter {
         $pagetypes = array_flip($this->lessonpagetypes);
         $mqxmltype = $pagetypes[$pagetype];
 
-
         // Start with the standard XML common to all question types.
         $mqxml = '<quiz><question type="' . $mqxmltype . '">';
         $mqxml .= '<name><text>' . $page->title . '</text></name>';
         $mqxml .= '<questiontext format="html"><text>' . $page->contents . '</text></questiontext>';
 
-        $grades_list = "";
+        $gradeslist = "";
 
         // Loop through the answers for some question types.
         switch ($mqxmltype) {
@@ -169,7 +167,7 @@ class questionconverter {
                         $grade = - 100 / $nincorrect;
                     }
                     // Add the Jump to link to the answer.
-                    $grades_list .= "$answer->answer: defaultmark = $defaultmark; score = $answer->score; grade = $grade\n";
+                    $gradeslist .= "$answer->answer: defaultmark = $defaultmark; score = $answer->score; grade = $grade\n";
                     $mqxml .= '<answer fraction="' . $grade . '" format="html"><text>' . $answerstring . '</text>';
                     $mqxml .= '<feedback format="html"><text><![CDATA[' . $responsestring . ']]></text></feedback>';
                     $mqxml .= '</answer>';
@@ -204,7 +202,7 @@ class questionconverter {
                         $grade = ($answer->score / $defaultmark) * 100;
                     }
                     // Add the Jump to link to the answer.
-                    $grades_list .= "$answer->answer: defaultmark = $defaultmark; score = $answer->score; grade = $grade\n";
+                    $gradeslist .= "$answer->answer: defaultmark = $defaultmark; score = $answer->score; grade = $grade\n";
                     $mqxml .= '<answer fraction="' . $grade . '" format="moodle_auto_format"><text>' . $answerstring . '</text>';
                     $mqxml .= '<feedback format="html"><text>' . $responsestring . '</text></feedback>';
                     if ($mqxmltype == 'numerical') {
@@ -236,7 +234,7 @@ class questionconverter {
                 $answer = $answers[0];
                 $mqxml .= str_replace('{defaultmark}', $answer->score, $this->commonqxml);
                 $jumplink = $this->get_jumplink($answer, $mqxmltype);
-                $grades_list .= "$answer->answer: defaultmark = $answer->score;\n";
+                $gradeslist .= "$answer->answer: defaultmark = $answer->score;\n";
                 $mqxml .= str_replace('{jump}',  $jumplink, $this->qmetadata[$mqxmltype]);
 
                 break;
@@ -246,9 +244,9 @@ class questionconverter {
                 $correctjumplink = $this->get_jumplink($correctanswer, $mqxmltype);
                 $incorrectanswer = $answers[1];
                 $incorrectjumplink = $this->get_jumplink($incorrectanswer, $mqxmltype);
-                $grades_list .= "$correctanswer->answer: defaultmark = $correctanswer->score;\n";
+                $gradeslist .= "$correctanswer->answer: defaultmark = $correctanswer->score;\n";
                 array_shift($answers); // Remove correct answer element.
-                $grades_list .= "$incorrectanswer->answer: score = $incorrectanswer->score;\n";
+                $gradeslist .= "$incorrectanswer->answer: score = $incorrectanswer->score;\n";
                 array_shift($answers); // Remove incorrect answer element.
 
                 $matchingmetadata = str_replace('{correctfeedback}', $correctjumplink, $this->qmetadata[$mqxmltype]);
@@ -267,7 +265,8 @@ class questionconverter {
 
         // Convert the Moodle Question XML into Word-compatible XHTML.
         $mqxml2xhtml = new mqxmlconverter($this->xsltparameters['pluginname']);
-        $xhtmldata = $mqxml2xhtml->convert_mqx2htm($mqxml, $this->xsltparameters['pluginname'], $this->xsltparameters['imagehandling']);
+        $xhtmldata = $mqxml2xhtml->convert_mqx2htm($mqxml, $this->xsltparameters['pluginname'],
+                $this->xsltparameters['imagehandling']);
         return $xhtmldata;
     }
 
@@ -412,54 +411,12 @@ class questionconverter {
         }
         // Next figure out what the URL part should be.
         if ($answer->jumpto <= 0) {
-            $linkid = $this->pagejumps[$answer->jumpto]; // For example: "previouspage", "nextpage".
+            $linkid = $this->pagejumps[$answer->jumpto]; // For example: previouspage.
         } else {
             $linkid = $answer->jumpto;
         }
 
         // Assemble the link and return it wrapped in a CDATA section for protection inside the Moodle Question XML.
         return '<![CDATA[<a href="#' . $linkid . '">' . $anchortext . '</a>]]>';
-    }
-    /**
-     * Library functions
-     *
-     * @copyright 2017 Adam King, SHEilds eLearning
-     * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
-     */
-
-    /**
-     * Retrieve and format question pages to include answers.
-     *
-     * @param stdClass $page A Lesson page
-     * @return Formatted page contents.
-     */
-    function local_lesson_wordimport_format_answers($page) {
-        $qconvert = new questionconverter();
-        $pagetype_label = $qconvert->get_pagetype_label($page->get_typeid());
-        // $pagetype = $page->get_typeid();
-        $pagehtml = $page->contents;
-        $answers = $page->answers;
-        $qtype = $page->qtype;
-
-        // Don't look for answers in lesson types.
-        if ($qconvert->is_lessonpage($page->get_typeid()) === false) {
-            return $pagehtml;
-        }
-
-
-        $pagehtml .= "<div class='export_answer_" . $pagetype_label . "_wrapper'>";
-
-        foreach ($answers as $answer) {
-            // If this is a matching question type, only print the answers, not responses.
-            if ($pagetype_label == 'matching' && $answer->answerformat == 1) {
-                continue;
-            }
-
-            $pagehtml .= "<div class='export_answer_$pagetype_label'>$answer->answer</div>";
-        }
-
-        $pagehtml .= "</div>";
-
-        return $pagehtml;
     }
 }

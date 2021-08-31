@@ -85,11 +85,12 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
     foreach ($pagefiles as $pagefile) {
         if ($file = $fs->get_file_by_hash(sha1("/$context->id/mod_lesson/importwordtemp/0/$pagefile->pathname"))) {
             $page = new stdClass();
-            $page->properties = $lesson->properties();
             // If this is the first page in a new lesson, set some default lesson properties which seem to work.
             // Otherwise the first page can't be created.
-            if ($lastpageid == 0) {
-            } else {
+            $page->properties = $lesson->properties();
+
+            // Need to fix this as it inserts the jumps on the previous page, I think.
+            if ($lastpageid !== 0) {
                 $page->pageid = $lastpageid;
             }
             $page->lessonid = $lesson->id;
@@ -106,7 +107,7 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
             $page->title = toolbook_importhtml_parse_title($htmlcontent, $pagefile->pathname);
 
             // Is this a Question page?
-            // if (stripos($htmlcontent, 'moodleQuestion') !== false) {
+            // ...ff (stripos($htmlcontent, 'moodleQuestion') !== false).
             if (false) {
                 // Convert XHTML into Moodle Question XML, ignoring images.
                 $mqxml = $qconverter->import_question($htmlcontent);
@@ -122,8 +123,6 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
                 $formatclass = 'qformat_xml';
                 require_once($CFG->dirroot.'/question/format/xml/format.php');
                 $format = new $formatclass();
-                // $format->set_importcontext($context);
-                // $format->setFilename($xmlfilename);
                 if (!($format->importprocess($xmlfilename, $lesson, $lastpageid))) {
                     unlink($xmlfilename);
                     throw new \moodle_exception(get_string('processerror', 'lesson'));
@@ -260,9 +259,6 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
                  break;
             default:
                  break;
-        }
-        if ($qconvert->is_lessonpage($page->type)) {
-        } else {  // Some kind of question page.
         }
 
         // Could use format_text($pagehtml, FORMAT_MOODLE, array('overflowdiv' => false, 'allowid' => true, 'para' => false));.
