@@ -89,7 +89,7 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
             // Otherwise the first page can't be created.
             $page->properties = $lesson->properties();
 
-            // Need to fix this as it inserts the jumps on the previous page, I think.
+            // [TODO] Need to fix this as it inserts the jumps on the previous page, I think.
             if ($lastpageid !== 0) {
                 $page->pageid = $lastpageid;
             }
@@ -107,7 +107,8 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
             $page->title = toolbook_importhtml_parse_title($htmlcontent, $pagefile->pathname);
 
             // Is this a Question page?
-            // ...ff (stripos($htmlcontent, 'moodleQuestion') !== false).
+            // ... Uncomment to test import: if (stripos($htmlcontent, 'moodleQuestion') !== false).
+            // [TODO] Fix this.
             if (false) {
                 // Convert XHTML into Moodle Question XML, ignoring images.
                 $mqxml = $qconverter->import_question($htmlcontent);
@@ -141,14 +142,17 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
                 // Configure automatic jumps for the page, since they are not explicitly included.
                 $i = 0;
                 $answers = array();
-                // Add jump to next page.
-                $answer = clone($newanswer);
-                $answer->jumpto = $qconverter->get_pagejump_number('nextpage');
-                $answer->answer = get_string('nextpage', 'mod_lesson');
-                $answer->id = $DB->insert_record("lesson_answers", $answer);
-                $answers[$answer->id] = new lesson_page_answer($answer);
-                $answers[$i] = $answer;
-                $i++;
+                // [TODO] Fix this.
+                // Add jump to next page, if we're not on the first page.
+                if ($lastpageid != 0) {
+                    $answer = clone($newanswer);
+                    $answer->jumpto = $qconverter->get_pagejump_number('nextpage');
+                    $answer->answer = get_string('nextpage', 'mod_lesson');
+                    $answer->id = $DB->insert_record("lesson_answers", $answer);
+                    $answers[$answer->id] = new lesson_page_answer($answer);
+                    $answers[$i] = $answer;
+                    $i++;
+                }
 
                 // Add jump to previous page if we're not the first page.
                 if ($lastpageid != 0 && $previousjump) {
