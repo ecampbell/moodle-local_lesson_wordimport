@@ -106,7 +106,8 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
             $page->title = toolbook_importhtml_parse_title($htmlcontent, $pagefile->pathname);
 
             // Is this a Question page?
-            if (stripos($htmlcontent, 'moodleQuestion') !== false) {
+            // if (stripos($htmlcontent, 'moodleQuestion') !== false) {
+            if (false) {
                 // Convert XHTML into Moodle Question XML, ignoring images.
                 $mqxml = $qconverter->import_question($htmlcontent);
 
@@ -122,7 +123,7 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
                 require_once($CFG->dirroot.'/question/format/xml/format.php');
                 $format = new $formatclass();
                 // $format->set_importcontext($context);
-                $format->setFilename($xmlfilename);
+                // $format->setFilename($xmlfilename);
                 if (!($format->importprocess($xmlfilename, $lesson, $lastpageid))) {
                     unlink($xmlfilename);
                     throw new \moodle_exception(get_string('processerror', 'lesson'));
