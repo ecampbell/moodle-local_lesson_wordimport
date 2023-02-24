@@ -24,8 +24,6 @@
 
 namespace local_lesson_wordimport\privacy;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Privacy Subsystem for local_lesson_wordimport implementing null_provider.
  *

@@ -89,7 +89,7 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
             // Otherwise the first page can't be created.
             $page->properties = $lesson->properties();
 
-            // [TODO] Need to fix this as it inserts the jumps on the previous page, I think.
+            // TODO: Need to fix this as it inserts the jumps on the previous page, I think.
             if ($lastpageid !== 0) {
                 $page->pageid = $lastpageid;
             }
@@ -142,7 +142,7 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
                 // Configure automatic jumps for the page, since they are not explicitly included.
                 $i = 0;
                 $answers = array();
-                // [TODO] Fix this.
+                // TODO: Fix this.
                 // Add jump to next page, if we're not on the first page.
                 if ($lastpageid != 0) {
                     $answer = clone($newanswer);
@@ -271,7 +271,7 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
 
         // Grab the images, convert any GIFs to PNG, and return the list of converted images.
         $giffilenames = array();
-        $imagestring = $word2xml->base64_images($context->id, 'mod_lesson', 'page_contents', $page->id, $giffilenames);
+        $imagestring = $word2xml->base64_images($context->id, 'mod_lesson', 'page_contents', $giffilenames, $page->id);
 
         // Grab the page text content, and update any GIF image names to the new PNG name.
         $pagehtml = file_rewrite_pluginfile_urls($pagehtml, 'pluginfile.php', $context->id,

@@ -391,7 +391,7 @@ class questionconverter {
                 break;
             case "shortanswer":
             case "numerical":
-                if ($answer->response == '' and $answer->jumpto <= 0) {
+                if ($answer->response == '' && $answer->jumpto <= 0) {
                     $anchortext = get_string($this->pagejumps[$answer->jumpto], 'mod_lesson');
                 } else if ($answer->response == '') {
                     $anchortext = $this->lessonpages[$answer->jumpto]->title;
