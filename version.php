@@ -28,6 +28,6 @@ $plugin->version = 2023022402;              // The current plugin version (Date:
 $plugin->requires = 2016052300;               // Requires Moodle 3.1 or higher.
 $plugin->component = 'local_lesson_wordimport';   // Full name of the plugin (used for diagnostics).
 $plugin->maturity = MATURITY_STABLE;
-$plugin->release = '1.0.2 (Build: 2023022401)'; // Human readable version information.
+$plugin->release = '1.0.2 (Build: 2023022402)'; // Human readable version information.
 $plugin->dependencies = array('booktool_wordimport' => 2023021700, 'qformat_wordtable' => 2021083100);
 
