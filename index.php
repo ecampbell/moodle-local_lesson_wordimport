@@ -38,7 +38,7 @@ $imageformat = optional_param('imageformat', 'embedded', PARAM_TEXT); // Chapter
 
 // Security checks.
 list ($course, $cm) = get_course_and_cm_from_cmid($id, 'lesson');
-$lesson = $DB->get_record('lesson', array('id' => $cm->instance), '*', MUST_EXIST);
+$lesson = $DB->get_record('lesson', ['id' => $cm->instance], '*', MUST_EXIST);
 require_course_login($course, true, $cm);
 
 // Check import/export capabilities.
@@ -46,7 +46,7 @@ $context = context_module::instance($cm->id);
 require_capability('mod/lesson:manage', $context);
 
 // Set up page in case an import has been requested.
-$PAGE->set_url('/local/lesson_wordimport/index.php', array('id' => $id, 'action' => $action));
+$PAGE->set_url('/local/lesson_wordimport/index.php', ['id' => $id, 'action' => $action]);
 $PAGE->set_title($lesson->name);
 $PAGE->set_heading($course->fullname);
 
@@ -55,7 +55,7 @@ if ($action == 'export') {
     // Export the current lesson into XHTML, and write to a Word file.
     $lessontext = local_lesson_wordimport_export($lesson, $context, $imageformat);
     $filename = clean_filename(strip_tags(format_string($lesson->name)) . '.doc');
-    send_file($lessontext, $filename, 10, 0, true, array('filename' => $filename));
+    send_file($lessontext, $filename, 10, 0, true, ['filename' => $filename]);
     die;
 }
 
@@ -63,7 +63,7 @@ echo $OUTPUT->header();
 echo $OUTPUT->heading($lesson->name);
 
 // Set up the Word file upload form.
-$mform = new local_lesson_wordimport_form(null, array('id' => $id, 'action' => $action));
+$mform = new local_lesson_wordimport_form(null, ['id' => $id, 'action' => $action]);
 if ($mform->is_cancelled()) {
     // Form cancelled, go back.
     redirect($CFG->wwwroot . "/mod/lesson/view.php?id=$cm->id");
@@ -98,7 +98,7 @@ if (!$data) { // Display the form.
     local_lesson_wordimport_import($tmpfilename, $lesson, $context, false, $horizontaljumps, $displaymenu,
                 $previousjump, $endjump, $verbose);
     echo $OUTPUT->box_start('lessondisplay generalbox');
-    echo $OUTPUT->continue_button(new moodle_url('/mod/lesson/view.php', array('id' => $id)));
+    echo $OUTPUT->continue_button(new moodle_url('/mod/lesson/view.php', ['id' => $id]));
     echo $OUTPUT->box_end();
 }
 

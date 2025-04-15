@@ -44,12 +44,12 @@ function local_lesson_wordimport_extend_settings_navigation(settings_navigation 
 
     // Add the import link if the user has the capability.
     if (has_capability('mod/lesson:manage', $context)) {
-        $url1 = new moodle_url('/local/lesson_wordimport/index.php', array('id' => $PAGE->cm->id, 'action' => 'import'));
+        $url1 = new moodle_url('/local/lesson_wordimport/index.php', ['id' => $PAGE->cm->id, 'action' => 'import']);
         $menu->add(get_string('wordimport', 'local_lesson_wordimport'), $url1, navigation_node::TYPE_SETTING, null, null,
-               new pix_icon('f/document', '', 'moodle', array('class' => 'iconsmall', 'title' => '')));
-        $url2 = new moodle_url('/local/lesson_wordimport/index.php', array('id' => $PAGE->cm->id, 'action' => 'export'));
+               new pix_icon('f/document', '', 'moodle', ['class' => 'iconsmall', 'title' => '']));
+        $url2 = new moodle_url('/local/lesson_wordimport/index.php', ['id' => $PAGE->cm->id, 'action' => 'export']);
         $menu->add(get_string('wordexport', 'local_lesson_wordimport'), $url2, navigation_node::TYPE_SETTING,
-           null, null, new pix_icon('f/document', '', 'moodle', array('class' => 'iconsmall', 'title' => '')));
+           null, null, new pix_icon('f/document', '', 'moodle', ['class' => 'iconsmall', 'title' => '']));
     }
 
 }

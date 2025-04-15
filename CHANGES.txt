@@ -1,6 +1,7 @@
 # Change log
 
 Date          Version   Comment
+2025/04/15    1.0.3     Fix PHP 8.2 and code style issues.
 2023/02/24    1.0.2     Update for PHP 8.0/1 compatibility with Book Word import plugin.
 2021/08/31    1.0.1     Improve question page export, add automatic page jumps on import.
 2021/08/21    1.0.0     Stable release, convert GIF images to PNG on export for Word compatibility.

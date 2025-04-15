@@ -32,7 +32,7 @@ namespace local_lesson_wordimport\privacy;
  */
 class provider implements \core_privacy\local\metadata\null_provider {
 
-    use \core_privacy\local\legacy_polyfill;
+    use core_privacy\local\legacy_polyfill;
 
     /**
      * Get the language string identifier with the component's language
@@ -40,7 +40,7 @@ class provider implements \core_privacy\local\metadata\null_provider {
      *
      * @return  string
      */
-    public static function get_reason() : string {
+    public static function get_reason(): string {
         return 'privacy:metadata';
     }
 }

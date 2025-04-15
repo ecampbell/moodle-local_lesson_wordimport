@@ -24,7 +24,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-
 $string['cannotopentempfile'] = 'Cannot open temporary file <b>{$a}</b>';
 $string['endjump'] = 'Add "End of lesson" jump to content pages';
 $string['filetoimport'] = 'File to import.';
@@ -34,13 +33,12 @@ $string['importoptions_help'] = 'Check the boxes to add "Previous page" and "End
 $string['pluginname'] = 'Microsoft Word file Import/Export (Lesson)';
 $string['previousjump'] = 'Add "Previous page" jump to content pages';
 $string['privacy:metadata'] = 'The Microsoft Word file import/export tool for lessons does not store personal data.';
-$string['replacelesson'] = 'Replace lesson';
 $string['replaceglesson_help'] = 'Delete the current content of lesson before importing';
+$string['replacelesson'] = 'Replace lesson';
 $string['stylesheetunavailable'] = 'XSLT Stylesheet <b>{$a}</b> is not available';
-$string['transformationfailed'] = 'XSLT transformation failed (<b>{$a}</b>)';
 $string['teacherentry'] = 'Teacher entry';
+$string['transformationfailed'] = 'XSLT transformation failed (<b>{$a}</b>)';
 $string['wordexport'] = 'Export to Microsoft Word';
 $string['wordfilerequired'] = 'Microsoft Word file required';
 $string['wordimport'] = 'Import from Microsoft Word';
 $string['xsltunavailable'] = 'You need the XSLT library installed in PHP to save this Word file';
-

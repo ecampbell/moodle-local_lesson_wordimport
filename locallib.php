@@ -25,10 +25,10 @@
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/mod/lesson/lib.php');
 
-use \booktool_wordimport\wordconverter;
-use \local_lesson_wordimport\questionconverter;
-use \question\format\xml;
-use \mod\lesson\format;
+use booktool_wordimport\wordconverter;
+use local_lesson_wordimport\questionconverter;
+use question\format\xml;
+use mod\lesson\format;
 
 /**
  * Convert the Word file into a set of HTML files and insert them the current lesson.
@@ -48,7 +48,7 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
     global $CFG,  $DB, $PAGE;
 
     // Convert the Word file content into XHTML and an array of images.
-    $imagesforzipping = array();
+    $imagesforzipping = [];
     $word2xml = new wordconverter('local_lesson_wordimport');
     $htmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
 
@@ -62,10 +62,10 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
 
     // Import the content into Lesson pages.
 
-    $xsltparameters = array('pluginname' => 'local_lesson_wordimport',
+    $xsltparameters = ['pluginname' => 'local_lesson_wordimport',
             'heading1stylelevel' => 3, // Map "Heading 1" style to <h3> element.
-            'imagehandling' => 'referenced'
-        );
+            'imagehandling' => 'referenced',
+        ];
 
     // Prepare a temporary working area for the HTML and image files stored inside the Zip file.
     $fs = get_file_storage();
@@ -76,10 +76,10 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
     // Replace the standard lesson object with a real one, and get the current last page ID in the lesson.
     $lesson = new Lesson($lesson);
     $currentpages = $lesson->load_all_pages();
-    $lastpageid = $DB->get_field_sql('SELECT MAX(id) FROM {lesson_pages} WHERE lessonid = ?', array($lesson->id));
+    $lastpageid = $DB->get_field_sql('SELECT MAX(id) FROM {lesson_pages} WHERE lessonid = ?', [$lesson->id]);
 
     // Process the HTML files and insert them as Lesson pages. Argument 2 specifies whether Zip file contains directories.
-    $newpages = array(); // Array to store pages after they've been added to the database.
+    $newpages = []; // Array to store pages after they've been added to the database.
     $qconverter = new questionconverter($currentpages);
     $pagefiles = toolbook_importhtml_get_chapter_files($zipfile, 2);
     foreach ($pagefiles as $pagefile) {
@@ -89,7 +89,7 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
             // Otherwise the first page can't be created.
             $page->properties = $lesson->properties();
 
-            // TODO: Need to fix this as it inserts the jumps on the previous page, I think.
+            // TBD: Need to fix this as it inserts the jumps on the previous page, I think.
             if ($lastpageid !== 0) {
                 $page->pageid = $lastpageid;
             }
@@ -108,7 +108,7 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
 
             // Is this a Question page?
             // ... Uncomment to test import: if (stripos($htmlcontent, 'moodleQuestion') !== false).
-            // [TODO] Fix this.
+            // TBD: Fix this.
             if (false) {
                 // Convert XHTML into Moodle Question XML, ignoring images.
                 $mqxml = $qconverter->import_question($htmlcontent);
@@ -133,7 +133,7 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
                 $page->type = $page->qtype;
                 $page->layout = $horizontaljumps;
                 $page->display = $displaymenu;
-                $page->contents_editor = array();
+                $page->contents_editor = [];
                 $page->contents_editor['text'] = toolbook_importhtml_parse_body($htmlcontent);
                 $page->contents_editor['format'] = FORMAT_HTML;
                 // I don't know why we need both contents_editor['text'] and contents properties.
@@ -141,8 +141,8 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
 
                 // Configure automatic jumps for the page, since they are not explicitly included.
                 $i = 0;
-                $answers = array();
-                // TODO: Fix this.
+                $answers = [];
+                // TBD: Fix this.
                 // Add jump to next page, if we're not on the first page.
                 if ($lastpageid != 0) {
                     $answer = clone($newanswer);
@@ -193,8 +193,8 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
         // Find references to all image files and copy them.
         $matches = null;
         if (preg_match_all('/src="([^"]+)"/i', $page->contents, $matches)) {
-            $filerecord = array('contextid' => $context->id, 'component' => 'mod_lesson', 'filearea' => 'page_contents',
-                            'itemid' => $page->id);
+            $filerecord = ['contextid' => $context->id, 'component' => 'mod_lesson', 'filearea' => 'page_contents',
+                            'itemid' => $page->id];
             $dbhtml = $page->contents; // Copy page content temporarily, as $page->contents causes absolute URL in the image.
             foreach ($matches[0] as $i => $match) {
                 $filepath = '/' . $matches[1][$i];
@@ -206,12 +206,12 @@ function local_lesson_wordimport_import(string $wordfilename, stdClass $lesson, 
                     $dbhtml = str_replace($match, 'src="@@PLUGINFILE@@' . $filepath . '"', $dbhtml);
                 }
             }
-            $DB->set_field('lesson_pages', 'contents', $dbhtml, array('id' => $page->id));
+            $DB->set_field('lesson_pages', 'contents', $dbhtml, ['id' => $page->id]);
         }
     }
     unset($newpages);
 
-    // TODO: Rewrite link references in the HTML.
+    // TBD: Rewrite link references in the HTML.
 
     $fs->delete_area_files($context->id, 'mod_lesson', 'importwordtemp', 0);
 }
@@ -233,7 +233,7 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
     // Set the Lesson name to be the Word file title.
     $lessonhtml = '<p class="MsoTitle">' . $lesson->name . "</p>\n";
     // Add the Description field.
-    // TODO: figure out how to include images, using file_rewrite_pluginfile_urls().
+    // TBD: figure out how to include images, using file_rewrite_pluginfile_urls().
     $lessonhtml .= $lesson->intro;
 
     $qconvert = new questionconverter($pages);
@@ -265,17 +265,17 @@ function local_lesson_wordimport_export(stdClass $lesson, context_module $contex
                  break;
         }
 
-        // Could use format_text($pagehtml, FORMAT_MOODLE, array('overflowdiv' => false, 'allowid' => true, 'para' => false));.
+        // Could use format_text($pagehtml, FORMAT_MOODLE, ['overflowdiv' => false, 'allowid' => true, 'para' => false]);.
         // Revert image paths back to @@PLUGINFILE@@ so that export function works properly.
         // Must revert after format_text(), or a debug developer error is triggered.
 
         // Grab the images, convert any GIFs to PNG, and return the list of converted images.
-        $giffilenames = array();
+        $giffilenames = [];
         $imagestring = $word2xml->base64_images($context->id, 'mod_lesson', 'page_contents', $giffilenames, $page->id);
 
         // Grab the page text content, and update any GIF image names to the new PNG name.
         $pagehtml = file_rewrite_pluginfile_urls($pagehtml, 'pluginfile.php', $context->id,
-                                  'mod_lesson', 'page_contents', $page->id, array('reverse' => true));
+                                  'mod_lesson', 'page_contents', $page->id, ['reverse' => true]);
         if (count($giffilenames) > 0) {
             $pagehtml = str_replace($giffilenames['gif'], $giffilenames['png'], $pagehtml);
         }
@@ -303,10 +303,10 @@ function local_lesson_wordimport_get_text_labels() {
     global $CFG;
 
     // Release-independent list of all strings required in the XSLT stylesheets for labels etc.
-    $textstrings = array(
-        'lesson' => array('modulename', 'modulename_help', 'modulename_link', 'pluginname'),
-        'moodle' => array('no', 'yes', 'tags'),
-        );
+    $textstrings = [
+        'lesson' => ['modulename', 'modulename_help', 'modulename_link', 'pluginname'],
+        'moodle' => ['no', 'yes', 'tags'],
+        ];
 
     $labelstring = "<moodlelabels>";
     foreach ($textstrings as $typegroup => $grouparray) {

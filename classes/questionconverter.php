@@ -28,8 +28,8 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/mod/lesson/lib.php');
 require_once($CFG->dirroot . '/question/format/wordtable/format.php');
 
-use \booktool_wordimport\wordconverter;
-use \qformat_wordtable\mqxmlconverter;
+use booktool_wordimport\wordconverter;
+use qformat_wordtable\mqxmlconverter;
 
 /**
  * Convert Lesson questions into Moodle Question XML and then XHTML, and vice versa
@@ -39,10 +39,10 @@ use \qformat_wordtable\mqxmlconverter;
 class questionconverter {
 
     /** @var array Mapping between lesson question page type names and numbers. */
-    private $lessonpages = array();
+    private $lessonpages = [];
 
     /** @var array Mapping between lesson question page type names and numbers. */
-    private $lessonpagetypes = array(
+    private $lessonpagetypes = [
         "shortanswer" => 1,
         "truefalse" => 2,
         "multichoice" => 3,
@@ -52,23 +52,23 @@ class questionconverter {
         "lessonpage" => 20,
         "branchend" => 21,
         "clusterstart" => 30,
-        "clusterend" => 31
-    );
+        "clusterend" => 31,
+    ];
 
     /** @var array Mapping between lesson question page type names and numbers. */
-    private $pagejumps = array(
+    private $pagejumps = [
         "nextpage" => -1,
         "previouspage" => -40,
         "thispage" => 0,
-        "endoflesson" => -9
-    );
+        "endoflesson" => -9,
+    ];
 
     /** @var string Common XML fragment for all questions */
     private $commonqxml = '<generalfeedback format="html"><text></text></generalfeedback><defaultgrade>{defaultmark}</defaultgrade>
                 <penalty>0.3333333</penalty><hidden>0</hidden>';
 
     /** @var string Default MCQ question */
-    private $qmetadata = array('multichoice' => '<single>{singleanswer}</single><shuffleanswers>true</shuffleanswers>
+    private $qmetadata = ['multichoice' => '<single>{singleanswer}</single><shuffleanswers>true</shuffleanswers>
                 <answernumbering>ABCD</answernumbering><correctfeedback format="html"><text></text></correctfeedback>
                 <incorrectfeedback format="html"><text></text></incorrectfeedback><shownumcorrect/>',
         'essay' => '<responseformat>editorfilepicker</responseformat><responserequired>1</responserequired>
@@ -78,7 +78,8 @@ class questionconverter {
                 <incorrectfeedback format="html"><text>{incorrectfeedback}</text></incorrectfeedback>',
         'numerical' => '',
         'shortanswer' => '<usecase>0</usecase>',
-        'truefalse' => '');
+        'truefalse' => '',
+        ];
 
     /**
      * Class constructor
@@ -90,12 +91,12 @@ class questionconverter {
         $this->lessonpages = $pages;
 
         // Set common parameters for all XSLT transformations.
-        $this->xsltparameters = array(
+        $this->xsltparameters = [
             'pluginname' => 'local_lesson_wordimport',
             'imagehandling' => 'referenced', // Question banks are embedded, Lessons are referenced.
             'heading1stylelevel' => 3, // Question banks are 1, Lessons should be overridden to 3.
-            'debug_flag' => (debugging(null, DEBUG_DEVELOPER)) ? '1' : '0'
-            );
+            'debug_flag' => (debugging(null, DEBUG_DEVELOPER)) ? '1' : '0',
+            ];
     }
 
     /**

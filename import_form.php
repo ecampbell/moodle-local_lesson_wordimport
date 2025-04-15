@@ -51,7 +51,7 @@ class local_lesson_wordimport_form extends moodleform {
 
         // User can select 1 and only 1 Word file which must have a .docx suffix (not .docm or .doc).
         $mform->addElement('filepicker', 'importfile', get_string('filetoimport', 'local_lesson_wordimport'), null,
-                           array('subdirs' => 0, 'accepted_types' => array('.docx')));
+                           ['subdirs' => 0, 'accepted_types' => ['.docx']]);
         $mform->addHelpButton('importfile', 'filetoimport', 'local_lesson_wordimport');
         $mform->addRule('importfile', null, 'required', null, 'client');
 
