@@ -370,6 +370,7 @@ class questionconverter {
      * Get the jump link HTML
      *
      * @param lesson_page_answer $answer Answer details
+     * @param string $mqxmltype Question type
      * @return string Link HTML
      */
     public function get_jumplink($answer, string $mqxmltype) {

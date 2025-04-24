@@ -39,6 +39,7 @@ use mod\lesson\format;
  * @param int $pageid Current page ID
  * @param bool $horizontaljumps Jump button layout
  * @param bool $displaymenu Display menu on left
+ * @param bool $previousjump Add jump to previous content page
  * @param bool $endjump Add end of lesson jump to each content page
  * @param bool $verbose Print extra information
  * @return void
