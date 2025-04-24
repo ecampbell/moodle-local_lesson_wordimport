@@ -24,10 +24,10 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version = 2025041500;              // The current plugin version (Date: YYYYMMDDXX).
-$plugin->requires = 2025041400;               // Requires Moodle 5.0 or higher.
+$plugin->version = 2025042400;              // The current plugin version (Date: YYYYMMDDXX).
+$plugin->requires = 2023041800;               // Requires Moodle 4.2 or higher.
 $plugin->component = 'local_lesson_wordimport';   // Full name of the plugin (used for diagnostics).
 $plugin->maturity = MATURITY_STABLE;
-$plugin->release = '1.0.3 (Build: 2025041500)'; // Human readable version information.
-$plugin->dependencies = ['booktool_wordimport' => 2025041501, 'qformat_wordtable' => 2025041500];
+$plugin->release = '1.0.3 (Build: 2025042400)'; // Human readable version information.
+$plugin->dependencies = ['booktool_wordimport' => 2025042300, 'qformat_wordtable' => 2025042400];
 
